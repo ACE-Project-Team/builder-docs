@@ -46,11 +46,18 @@ end
 AskBob.Card = card
 
 -- Text drawn straight over the game world (the spawnmenu tab is see-through, like Dupes).
+-- Text drawn straight on the background: white over the world in the
+-- spawnmenu, dark on the solid standalone window.
 local function glass(parent, text, font)
+	local p = parent
+	while IsValid(p) and not p.IsAskBob do p = p:GetParent() end
+	if IsValid(p) and p.Solid then return AskBob.Label(parent, text, font, C.text) end
 	local lbl = AskBob.Label(parent, text, font, color_white)
 	lbl:SetExpensiveShadow(2, Color(0, 0, 0, 230))
 	return lbl
 end
+
+local CROSS = Material("icon16/cross.png")
 
 -- A solid white sheet that grows with its children, for long text such as articles.
 local function sheet(parent)
@@ -125,6 +132,7 @@ end
 local PANEL = {}
 
 function PANEL:Init()
+	self.IsAskBob = true
 	self.Chips = {}
 	self.Filters = {}
 	self.RequestId = 0
@@ -269,17 +277,28 @@ end
 
 function PANEL:RebuildChips()
 	self.ChipBar:Clear()
-	self.ChipBar:SetTall(#self.Chips > 0 and 26 or 0)
+	self.ChipBar:SetTall(#self.Chips > 0 and 28 or 0)
 	self.ChipBar:DockMargin(0, 0, 0, #self.Chips > 0 and 6 or 0)
 
+	-- "Asking about" pill: what Bob will combine with the typed question.
 	for i, chip in ipairs(self.Chips) do
 		local b = vgui.Create("DButton", self.ChipBar)
-		b:SetText(chip.label .. "   x")
+		b:SetText(chip.label)
 		b:SetTooltip("Bob will ask about this. Click to remove.")
 		b:SetIcon(chip.icon or "icon16/brick.png")
-		b:SizeToContentsX(30)
+		b:SizeToContentsX(52)
 		b:Dock(LEFT)
 		b:DockMargin(0, 0, 6, 0)
+		b:SetTextInset(0, 0)
+		b.Paint = function(s, w, h)
+			local hov = s:IsHovered()
+			draw.RoundedBox(h / 2, 0, 0, w, h, C.accent)
+			draw.RoundedBox(h / 2, 1, 1, w - 2, h - 2, hov and C.hover or C.card)
+			s:SetTextColor(C.text)
+			surface.SetMaterial(CROSS)
+			surface.SetDrawColor(255, 255, 255, hov and 255 or 140)
+			surface.DrawTexturedRect(w - 22, h / 2 - 8, 16, 16)
+		end
 		b.DoClick = function() self:RemoveChip(i) end
 	end
 end
@@ -615,6 +634,7 @@ function AskBob.Open(query, chips)
 		frame.Bob = vgui.Create("AskBobPanel", frame)
 		frame.Bob:Dock(FILL)
 		frame.Bob.Solid = true
+		frame.Bob:ShowHome() -- redraw with dark text now that it is solid
 		AskBob.Frame = frame
 	end
 

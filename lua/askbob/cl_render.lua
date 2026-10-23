@@ -10,7 +10,7 @@ surface.CreateFont("AskBob.Code", { font = "Consolas", size = 14, weight = 400 }
 
 AskBob.Colors = {
 	-- Matches the default Derma skin so Bob sits next to the Tools tab without clashing.
-	bg      = Color(25, 25, 28, 235), -- standalone window only; the tab is see-through
+	bg      = Color(228, 228, 228), -- standalone window only; the tab is see-through
 	card    = Color(255, 255, 255, 245),
 	hover   = Color(229, 241, 255),
 	border  = Color(190, 190, 190),
