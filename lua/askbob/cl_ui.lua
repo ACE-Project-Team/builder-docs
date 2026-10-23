@@ -105,7 +105,9 @@ local KNOWN = {
 	filters = { { token = "ace", label = "ACE", kind = "ace" } },
 	orgs = {},
 }
-local ICONS = { ace = "icon16/shield.png", library = "icon16/book.png" }
+local ICONS = { ace = "icon16/shield.png", library = "icon16/book.png", org = "icon16/group.png", gmod = "icon16/script_code.png" }
+-- Result types whose name doesn't read well capitalised.
+local TYPE_LABELS = { gmodwiki = "GMod wiki" }
 
 -- Content column never grows past this, so the layout stays centered on wide screens.
 local MAX_WIDTH = 820
@@ -310,7 +312,7 @@ function PANEL:RebuildFilters()
 		end
 	end
 
-	-- Org wikis picked from the menu stay visible as their own toggles.
+	-- Wikis picked from the "Other" menu stay visible as their own toggles.
 	local orgLabel = {}
 	for _, o in ipairs(KNOWN.orgs) do orgLabel[o.token] = o.label end
 	for token in SortedPairs(self.Filters) do
@@ -333,7 +335,7 @@ function PANEL:RebuildFilters()
 
 	if #KNOWN.orgs == 0 then return end
 	local org = vgui.Create("DButton", bar)
-	org:SetText("Org wikis")
+	org:SetText("Other")
 	org:SetIcon("icon16/group_add.png")
 	org:SizeToContentsX(30)
 	org:SetTall(24)
@@ -401,6 +403,28 @@ function PANEL:SetBusy(busy)
 	self.Busy = busy
 	self.Go:SetEnabled(not busy)
 	self.Go:SetText(busy and "Asking..." or "Ask Bob")
+	self:BobMood(busy and "think" or "idle")
+end
+
+-- Bob the mascot, Q-menu tab only (the standalone window never calls this):
+-- a big one greets on the home view, a small one sits by the search box elsewhere.
+function PANEL:EnableMascot()
+	self.MiniBob = vgui.Create("AskBobMascot", self.Home:GetParent())
+	self.MiniBob:Dock(LEFT)
+	self.MiniBob:DockMargin(0, 0, 4, 0)
+	self.MiniBob:SetWide(32)
+	self.MiniBob:MoveToBack()
+	self:ShowHome()
+end
+
+function PANEL:BobMood(mood)
+	if IsValid(self.MiniBob) then self.MiniBob:SetMood(mood) end
+end
+
+function PANEL:ShowMiniBob(show)
+	if not IsValid(self.MiniBob) or self.MiniBob:IsVisible() == show then return end
+	self.MiniBob:SetVisible(show)
+	self.MiniBob:GetParent():InvalidateLayout()
 end
 
 -- White card with a spinner and a seconds counter, so a slow answer doesn't look broken.
@@ -434,6 +458,8 @@ function PANEL:Clear()
 	self.RequestId = self.RequestId + 1
 	self.OnResults = nil
 	if self.Busy then self:SetBusy(false) end
+	self:BobMood("idle")
+	self:ShowMiniBob(true)
 	self.Body:Clear()
 	self.Body:GetVBar():SetScroll(0)
 	return self.Body
@@ -446,9 +472,18 @@ function PANEL:ShowHome(hint)
 		card(body, { title = "What to ask Bob", body = hint, color = C.accent })
 	end
 
+	local bob = IsValid(self.MiniBob)
+	if bob then
+		self:ShowMiniBob(false)
+		local big = vgui.Create("AskBobMascot", body)
+		big:Dock(TOP)
+		big:SetTall(112)
+		big:DockMargin(0, 16, 0, 0)
+	end
+
 	local hi = glass(body, "Hi, I'm Bob.", "AskBob.Hero")
 	hi:SetContentAlignment(5)
-	hi:DockMargin(0, 24, 0, 4)
+	hi:DockMargin(0, bob and 4 or 24, 0, 4)
 	local intro = glass(body, "Ask me about building, wiring, E2, Starfall and anything in the ACE wikis. "
 		.. "I look things up on acegmod.com and show you the best page I can find.", "AskBob.Body")
 	intro:SetContentAlignment(5)
@@ -746,6 +781,7 @@ function PANEL:RenderResults(query, ok, data, ponder)
 
 	-- Nothing useful: lead with where a person can actually help.
 	if not qa and (#list == 0 or top < LOW_SCORE) then
+		self:BobMood("unsure")
 		local s = sheet(body)
 		s:DockMargin(0, 0, 0, 8)
 		AskBob.Label(s, "Bob doesn't know this one yet.", "AskBob.Title", C.warn):DockMargin(0, 0, 0, 4)
@@ -766,6 +802,7 @@ function PANEL:RenderResults(query, ok, data, ponder)
 	end
 
 	if qa then
+		if IsValid(self.MiniBob) then self.MiniBob:Happy() end
 		local s = sheet(body)
 		s:DockMargin(0, 0, 0, 10)
 		local inner = s.Paint
@@ -783,14 +820,22 @@ function PANEL:RenderResults(query, ok, data, ponder)
 	end
 
 	local function resultCard(r)
-		local kind = string.upper(string.sub(r.type or "", 1, 1)) .. string.sub(r.type or "", 2)
+		local kind = TYPE_LABELS[r.type] or (string.upper(string.sub(r.type or "", 1, 1)) .. string.sub(r.type or "", 2))
 		local sub = kind
-		if r.meta and r.meta ~= "" and string.lower(r.meta) ~= string.lower(kind) then sub = sub .. "  ·  " .. r.meta end
+		-- For GMod wiki hits the meta is the page kind: function, hook, enum, ...
+		if isstring(r.meta) and r.meta ~= "" and string.lower(r.meta) ~= string.lower(kind) then sub = sub .. "  ·  " .. r.meta end
 		return card(body, {
 			title = r.title,
 			subtitle = sub,
 			body = r.description,
-			onClick = function() self:OpenResult(r.url) end,
+			onClick = function()
+				-- gmodwiki.com pages can't be read in-game; they open in the Steam browser.
+				if r.type == "gmodwiki" and isstring(r.url) and string.match(r.url, "^https://gmodwiki%.com/") then
+					gui.OpenURL(r.url)
+				else
+					self:OpenResult(r.url)
+				end
+			end,
 		})
 	end
 

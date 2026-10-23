@@ -19,6 +19,7 @@ end
 client("askbob/cl_api.lua")
 client("askbob/cl_ponder.lua")
 client("askbob/cl_render.lua")
+client("askbob/cl_mascot.lua")
 client("askbob/cl_ui.lua")
 client("askbob/cl_spawnmenu.lua")
 client("askbob/cl_options.lua")
