@@ -109,6 +109,8 @@ local ICONS = { ace = "icon16/shield.png", library = "icon16/book.png" }
 
 -- Content column never grows past this, so the layout stays centered on wide screens.
 local MAX_WIDTH = 820
+-- Longest question /api/public/search accepts.
+local MAX_QUERY = 200
 
 local GRADIENT = Material("gui/gradient")
 -- ACE's brand red (the website's --accent) and a deeper shade for the gradient.
@@ -218,6 +220,8 @@ function PANEL:Init()
 	self.Entry:SetFont("AskBob.Body")
 	self.Entry:SetPlaceholderText("Ask Bob anything, e.g. \"how do I make a hologram\"")
 	self.Entry.OnEnter = function() self:Search() end
+	-- The site refuses questions over 200 characters; stop typing there.
+	if isfunction(self.Entry.SetMaximumCharCount) then self.Entry:SetMaximumCharCount(MAX_QUERY) end
 
 	-- Wraps onto a second row instead of running off the edge.
 	self.FilterBar = vgui.Create("DIconLayout", self)
@@ -560,6 +564,12 @@ function PANEL:Search()
 
 	if #query < 2 then
 		self:ShowHome()
+		return
+	end
+	-- A paste can still get past the box's limit, and chips add to the query.
+	if #query > MAX_QUERY then
+		self:RenderResults(query, false, "That's too long for Bob (" .. #query .. " characters, the limit is "
+			.. MAX_QUERY .. "). Shorten it to the question itself, like \"how do I link ammo to a gun\".", {})
 		return
 	end
 
