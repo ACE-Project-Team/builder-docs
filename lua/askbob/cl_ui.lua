@@ -285,8 +285,43 @@ end
 
 -- Views --------------------------------------------------------------------------
 
+-- While a request is out the Ask button is locked, so one click = one request.
+function PANEL:SetBusy(busy)
+	self.Busy = busy
+	self.Go:SetEnabled(not busy)
+	self.Go:SetText(busy and "Asking..." or "Ask Bob")
+end
+
+-- White card with a spinner and a seconds counter, so a slow answer doesn't look broken.
+function PANEL:Loading(body, text)
+	self:SetBusy(true)
+	local started = SysTime()
+	local p = vgui.Create("DPanel", body)
+	p:Dock(TOP)
+	p:SetTall(44)
+	p.Paint = function(_, w, h)
+		draw.RoundedBox(4, 0, 0, w, h, C.border)
+		draw.RoundedBox(4, 1, 1, w - 2, h - 2, C.card)
+
+		local t = SysTime() - started
+		for i = 0, 7 do
+			local a = (i / 8) * math.pi * 2 + t * 4
+			local alpha = 40 + 215 * ((i / 8 + t * 4 / (math.pi * 2)) % 1)
+			draw.RoundedBox(2, 22 + math.cos(a) * 9 - 2, h / 2 + math.sin(a) * 9 - 2, 4, 4,
+				Color(C.accent.r, C.accent.g, C.accent.b, alpha))
+		end
+
+		local secs = math.floor(t)
+		local line = text .. (secs > 0 and ("  " .. secs .. "s") or "")
+		if t > 8 then line = line .. "  -  still waiting for " .. API.Base() end
+		draw.SimpleText(line, "AskBob.Body", 44, h / 2, C.text, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+	end
+	return p
+end
+
 function PANEL:Clear()
 	self.RequestId = self.RequestId + 1
+	if self.Busy then self:SetBusy(false) end
 	self.Body:Clear()
 	self.Body:GetVBar():SetScroll(0)
 	return self.Body
@@ -354,11 +389,12 @@ function PANEL:ShowArticle(slug, url)
 	if back then button(row, "Back", "icon16/arrow_left.png", function() self:RenderResults(unpack(back)) end) end
 	button(row, "Open on website", "icon16/world_go.png", function() gui.OpenURL(API.Absolute(url)) end)
 
-	local loading = glass(body, "Bob is reading...", "AskBob.Body")
+	local loading = self:Loading(body, "Bob is reading...")
 
 	API.Article(slug, function(ok, article)
 		if not IsValid(self) or self.RequestId ~= id then return end
 		loading:Remove()
+		self:SetBusy(false)
 		if not ok then
 			card(body, { title = "Hmm.", body = article, color = C.warn })
 			return
@@ -390,6 +426,7 @@ function PANEL:SetQuery(text)
 end
 
 function PANEL:Search()
+	if self.Busy then return end
 	local text = string.Trim(self.Entry:GetValue() or "")
 
 	-- "+sf draw line" → scope token "sf", query "draw line".
@@ -415,7 +452,7 @@ function PANEL:Search()
 
 	local body = self:Clear()
 	local id = self.RequestId
-	glass(body, "Bob is looking...", "AskBob.Body")
+	self:Loading(body, "Bob is looking...")
 
 	local ponder = AskBob.Ponder.Search(query)
 	local scopeStr = table.concat(AskBob.SplitList(table.concat(scope, ",")), ",")
