@@ -68,7 +68,8 @@ local function get(path, params, callback)
 	HTTP({
 		url = url,
 		method = "GET",
-		headers = { ["User-Agent"] = "AskBob/" .. AskBob.Version },
+		-- GMod refuses to override User-Agent, so the version rides in its own header.
+		headers = { ["X-AskBob-Version"] = AskBob.Version },
 		success = function(code, body)
 			if code ~= 200 then
 				callback(false, ERRORS[code] or ("Bob got an unexpected answer (" .. code .. ")."))

@@ -15,8 +15,9 @@ local function card(parent, opts)
 
 	p.Paint = function(s, w, h)
 		local hovered = opts.onClick and (s:IsHovered() or s:IsChildHovered())
-		draw.RoundedBox(4, 0, 0, w, h, hovered and C.hover or C.card)
-		if opts.color then draw.RoundedBoxEx(4, 0, 0, 3, h, opts.color, true, false, true, false) end
+		draw.RoundedBox(4, 0, 0, w, h, hovered and (opts.color or C.accent) or C.border)
+		draw.RoundedBox(4, 1, 1, w - 2, h - 2, hovered and C.hover or C.card)
+		if opts.color then draw.RoundedBoxEx(4, 0, 0, 4, h, opts.color, true, false, true, false) end
 	end
 
 	local function add(text, font, color)
@@ -64,12 +65,43 @@ local function buttonRow(parent)
 	return row
 end
 
+-- Search filters shown as toggles under the search box. None selected = everything.
+local FILTERS = {
+	{ token = "ace", label = "ACE",      icon = "icon16/shield.png" },
+	{ token = "acf", label = "ACF",      icon = "icon16/bomb.png" },
+	{ token = "e2",  label = "E2",       icon = "icon16/chip.png" },
+	{ token = "sf",  label = "Starfall", icon = "icon16/star.png" },
+	{ token = "tpg", label = "TPG",      icon = "icon16/flag_red.png" },
+}
+
+-- Content column never grows past this, so the layout stays centered on wide screens.
+local MAX_WIDTH = 820
+
+local function toggle(parent, text, icon, isOn, onClick)
+	local b = vgui.Create("DButton", parent)
+	b:SetText(text)
+	if icon then b:SetIcon(icon) end
+	b:SizeToContentsX(30)
+	b:SetTall(24)
+	b:Dock(LEFT)
+	b:DockMargin(0, 0, 4, 0)
+	b.Paint = function(s, w, h)
+		local on = isOn()
+		draw.RoundedBox(4, 0, 0, w, h, on and C.accent or (s:IsHovered() and C.accent or C.border))
+		draw.RoundedBox(4, 1, 1, w - 2, h - 2, on and C.accent or (s:IsHovered() and C.hover or C.card))
+		s:SetTextColor(on and color_white or C.text)
+	end
+	b.DoClick = onClick
+	return b
+end
+
 -- Panel ----------------------------------------------------------------------
 
 local PANEL = {}
 
 function PANEL:Init()
 	self.Chips = {}
+	self.Filters = {}
 	self.RequestId = 0
 	self:DockPadding(8, 8, 8, 8)
 
@@ -103,8 +135,15 @@ function PANEL:Init()
 	self.Entry:Dock(FILL)
 	self.Entry:DockMargin(4, 0, 4, 0)
 	self.Entry:SetFont("AskBob.Body")
-	self.Entry:SetPlaceholderText("Ask Bob anything, e.g. \"how do I make a hologram\" or \"+sf draw a line\"")
+	self.Entry:SetPlaceholderText("Ask Bob anything, e.g. \"how do I make a hologram\"")
 	self.Entry.OnEnter = function() self:Search() end
+
+	self.FilterBar = vgui.Create("DPanel", self)
+	self.FilterBar:Dock(TOP)
+	self.FilterBar:SetTall(24)
+	self.FilterBar:DockMargin(0, 0, 0, 10)
+	self.FilterBar:SetPaintBackground(false)
+	self:RebuildFilters()
 
 	self.Body = vgui.Create("DScrollPanel", self)
 	self.Body:Dock(FILL)
@@ -114,6 +153,61 @@ end
 
 function PANEL:Paint(w, h)
 	draw.RoundedBox(0, 0, 0, w, h, C.bg)
+end
+
+function PANEL:PerformLayout(w)
+	local side = math.max(8, math.floor((w - MAX_WIDTH) / 2))
+	local l, t, r, b = self:GetDockPadding()
+	if l ~= side then self:DockPadding(side, t, side, b) end
+end
+
+-- Filters ----------------------------------------------------------------------
+
+function PANEL:ToggleFilter(token)
+	self.Filters[token] = not self.Filters[token] or nil
+	self:RebuildFilters()
+	if string.Trim(self.Entry:GetValue() or "") ~= "" then self:Search() end
+end
+
+function PANEL:RebuildFilters()
+	local bar = self.FilterBar
+	bar:Clear()
+
+	toggle(bar, "Everything", "icon16/world.png", function() return next(self.Filters) == nil end, function()
+		self.Filters = {}
+		self:RebuildFilters()
+		if string.Trim(self.Entry:GetValue() or "") ~= "" then self:Search() end
+	end)
+
+	local known = {}
+	for _, f in ipairs(FILTERS) do
+		known[f.token] = true
+		toggle(bar, f.label, f.icon, function() return self.Filters[f.token] end, function() self:ToggleFilter(f.token) end)
+	end
+
+	-- Org wikis picked through "Org wiki..." stay visible as their own toggles.
+	for token in SortedPairs(self.Filters) do
+		if not known[token] then
+			toggle(bar, token, "icon16/group.png", function() return self.Filters[token] end, function() self:ToggleFilter(token) end)
+		end
+	end
+
+	local org = vgui.Create("DButton", bar)
+	org:SetText("Org wiki...")
+	org:SetIcon("icon16/group_add.png")
+	org:SizeToContentsX(30)
+	org:Dock(LEFT)
+	org:SetTooltip("Search one organization's wiki, e.g. pac3")
+	org.DoClick = function()
+		Derma_StringRequest("Ask Bob", "Organization name or short name (e.g. pac3):", "", function(text)
+			local token = string.lower(string.Trim(text or ""))
+			token = string.gsub(token, "[^%w%-_]", "")
+			if token == "" then return end
+			self.Filters[token] = true
+			self:RebuildFilters()
+			if string.Trim(self.Entry:GetValue() or "") ~= "" then self:Search() end
+		end)
+	end
 end
 
 -- Chips ------------------------------------------------------------------------
@@ -161,15 +255,18 @@ end
 function PANEL:ShowHome()
 	local body = self:Clear()
 
-	AskBob.Label(body, "Hi, I'm Bob.", "AskBob.Title"):DockMargin(0, 0, 0, 4)
-	AskBob.Label(body, "Ask me about building, wiring, E2, Starfall, ACF and anything in the ACE wikis. "
+	local hi = AskBob.Label(body, "Hi, I'm Bob.", "AskBob.Title")
+	hi:SetContentAlignment(5)
+	hi:DockMargin(0, 24, 0, 4)
+	local intro = AskBob.Label(body, "Ask me about building, wiring, E2, Starfall, ACF and anything in the ACE wikis. "
 		.. "I look things up on acegmod.com and show you the best page I can find.", "AskBob.Body", C.muted)
-		:DockMargin(0, 0, 0, 12)
+	intro:SetContentAlignment(5)
+	intro:DockMargin(40, 0, 40, 20)
 
 	card(body, {
 		title = "Tips",
 		body = "•  Right-click any entity in the C menu and pick \"Ask Bob about this\".\n"
-			.. "•  Narrow a search: +e2, +sf, +acf, +ace, or an org name like +pac3.\n"
+			.. "•  Use the buttons under the search box to only search E2, Starfall, ACF or an org wiki.\n"
 			.. "•  In the E2 or Starfall editor, select a function and press \"Ask Bob\".\n"
 			.. "•  Chat: " .. table.concat(AskBob.SplitList(GetConVar("askbob_chat_triggers"):GetString()), " or ") .. " <question>",
 	})
@@ -261,6 +358,8 @@ function PANEL:Search()
 		return ""
 	end)
 
+	for token in pairs(self.Filters) do scope[#scope + 1] = token end
+
 	local parts = { string.Trim(text) }
 	for _, chip in ipairs(self.Chips) do
 		parts[#parts + 1] = chip.query
@@ -312,7 +411,7 @@ function PANEL:RenderResults(query, ok, data, ponder)
 	end
 
 	if data.scope and data.scope.unknown and #data.scope.unknown > 0 then
-		AskBob.Label(body, "Bob doesn't know the filter: +" .. table.concat(data.scope.unknown, ", +"), "AskBob.Small", C.warn)
+		AskBob.Label(body, "Bob doesn't know the filter: " .. table.concat(data.scope.unknown, ", "), "AskBob.Small", C.warn)
 			:DockMargin(0, 0, 0, 6)
 	end
 

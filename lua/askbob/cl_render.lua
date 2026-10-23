@@ -8,15 +8,17 @@ surface.CreateFont("AskBob.Small", { font = "Roboto", size = 13, weight = 400 })
 surface.CreateFont("AskBob.Code", { font = "Consolas", size = 14, weight = 400 })
 
 AskBob.Colors = {
-	bg      = Color(30, 32, 38),
-	card    = Color(42, 45, 53),
-	hover   = Color(52, 56, 66),
-	accent  = Color(86, 156, 214),
-	ponder  = Color(120, 190, 120),
-	warn    = Color(225, 170, 70),
-	text    = Color(235, 235, 240),
-	muted   = Color(160, 165, 175),
-	code    = Color(22, 23, 27),
+	-- Matches the default Derma skin so Bob sits next to the Tools tab without clashing.
+	bg      = Color(234, 234, 234),
+	card    = Color(255, 255, 255),
+	hover   = Color(229, 241, 255),
+	border  = Color(190, 190, 190),
+	accent  = Color(52, 132, 214),
+	ponder  = Color(56, 150, 56),
+	warn    = Color(205, 125, 20),
+	text    = Color(40, 40, 40),
+	muted   = Color(115, 115, 115),
+	code    = Color(242, 242, 242),
 }
 local C = AskBob.Colors
 
