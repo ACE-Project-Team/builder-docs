@@ -2,8 +2,9 @@ AskBob.Version    = "0.1.0"
 AskBob.DefaultAPI = "https://acegmod.com"
 
 -- Hosts the client will ever send a request to. The API URL is a client-only
--- convar, but this list is the real guard: no server, map or other addon can
--- point a player's Bob at a host that would collect their IP.
+-- convar, and this list stops it, or anything that sets it, from pointing a
+-- player's Bob at some other host. It can't stop a server that replaces this
+-- addon's clientside Lua: in GMod a server can send any client code it likes.
 AskBob.AllowedHosts = {
 	["acegmod.com"] = true,
 	["www.acegmod.com"] = true,
@@ -18,7 +19,8 @@ CreateConVar("askbob_chat_triggers", "!bob,!ask", { FCVAR_ARCHIVE, FCVAR_REPLICA
 	"Chat commands that open Ask Bob, comma separated. Commands owned by ULX/ULib are skipped.")
 
 if CLIENT then
-	-- FCVAR_ARCHIVE only: never replicated, never settable by a server.
+	-- FCVAR_ARCHIVE only, never replicated. A server can still run ply:ConCommand,
+	-- so AllowedHosts above is what keeps this on acegmod.com or localhost.
 	CreateClientConVar("askbob_api_url", AskBob.DefaultAPI, true, false, "Ask Bob API base URL (ACE domain or localhost only).")
 	CreateClientConVar("askbob_ponder", "1", true, false, "Include installed Ponder tutorials in Ask Bob results.")
 	CreateClientConVar("askbob_key", "0", true, false, "Key that asks Bob about what you are looking at (0 = unbound).")
