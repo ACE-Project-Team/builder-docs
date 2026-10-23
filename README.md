@@ -7,8 +7,13 @@ In-game help for Garry's Mod, backed by the [ACE](https://acegmod.com) wiki, org
 - **Chat:** `!bob <question>` or `!ask <question>`. Server admins can change these, and Bob skips any trigger that ULX already uses.
 - **C menu:** right-click an entity, then "Ask Bob about this".
 - **"What is this?" key:** set it in Q menu → Options → Utilities → Ask Bob.
-- **E2 and Starfall editors:** an "Ask Bob" button in the toolbar. It searches your selection, the word under the caret, or the last error.
+- **E2 and Starfall editors:** an "Ask Bob" button in the toolbar. It offers your selection, the word under the caret, or the last error; with none of those it opens Bob on the Wiremod or Starfall filter. Bob is for how-to questions; E2Helper and SFHelper are quicker for what one function does.
 - **Console:** `askbob [question]`, `askbob_whatisthis`.
+
+## Filters and AI answers
+The buttons under the search box come from the website, so they match what the site holds: ACE, Starfall, Wiremod and other libraries, plus "Org wikis". Each library button covers its docs and its partner org's wiki.
+
+When the chosen filter's org has AI answers turned on (the same switch as the Discord bot's `+ai`), an **AI** button appears. It asks for a written answer about that project instead of a list of pages. Typing `+ai` in the box does the same.
 
 ## Convars
 | Convar | Realm | Default | |
@@ -20,7 +25,11 @@ In-game help for Garry's Mod, backed by the [ACE](https://acegmod.com) wiki, org
 | `askbob_key` | client | `0` | "what is this?" key |
 
 ## Privacy
-Bob sends only your question to acegmod.com. No SteamID, name or server address is sent. The site stores questions without who asked them. Responses are shown as text and never run as code.
+**What Bob sends:** your question and the filter you picked, to acegmod.com only. With an entity chip, its name and class are sent too; its stats stay in the game. No SteamID, name or server address is sent, though like any web request the site sees your IP. The site keeps questions, without who asked, to find gaps in the wiki.
+
+**AI answers:** when you press AI, acegmod.com passes your question to [DeepWiki](https://deepwiki.com), a third-party service, which answers from that project's public GitHub repo. Your game never contacts DeepWiki directly.
+
+**What comes back:** search results, article text and AI answers, all shown as plain text and never run as code. Links open through Steam's "leaving the game" prompt.
 
 ## For addon developers
 When a player asks Bob about one of your entities (C menu "Ask Bob about this", or the "What is this?" key), Bob builds a *chip* for it. Fill it in from your own addon with the `AskBob.Describe` hook. Bob doesn't need to be installed: without it the hook never runs.
