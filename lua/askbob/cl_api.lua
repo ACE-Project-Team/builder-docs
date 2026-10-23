@@ -68,7 +68,7 @@ local ERRORS = {
 	[503] = "Bob is taking a break (the API is switched off right now).",
 }
 
-local function get(path, params, callback)
+local function get(path, params, callback, retried)
 	local parts = {}
 	for k, v in SortedPairs(params or {}) do
 		if v ~= nil and v ~= "" then parts[#parts + 1] = k .. "=" .. urlencode(tostring(v)) end
@@ -104,8 +104,13 @@ local function get(path, params, callback)
 			cache[url] = { data = data, expires = SysTime() + CACHE_SECONDS }
 			callback(true, data)
 		end,
-		failed = function()
-			callback(false, "Bob can't reach " .. API.Base() .. " right now.")
+		failed = function(reason)
+			-- One quiet retry: a site restart or a dropped connection is usually gone a second later.
+			if not retried then
+				timer.Simple(1.5, function() get(path, params, callback, true) end)
+				return
+			end
+			callback(false, "Bob can't reach " .. API.Base() .. " right now (" .. tostring(reason or "no response") .. ").")
 		end,
 	})
 end
