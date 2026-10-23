@@ -100,6 +100,11 @@ function API.Search(query, opts, callback)
 	get("/api/public/search", { q = query, scope = opts.scope, types = opts.types }, callback)
 end
 
+-- { filters = { {token, label, kind}, ... }, orgs = { {token, label}, ... } }
+function API.Scopes(callback)
+	get("/api/public/search-scopes", nil, callback)
+end
+
 function API.Article(slug, callback)
 	get("/api/public/wiki/articles/" .. urlencode(slug), nil, callback)
 end

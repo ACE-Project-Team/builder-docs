@@ -65,14 +65,13 @@ local function buttonRow(parent)
 	return row
 end
 
--- Search filters shown as toggles under the search box. None selected = everything.
-local FILTERS = {
-	{ token = "ace", label = "ACE",      icon = "icon16/shield.png" },
-	{ token = "acf", label = "ACF",      icon = "icon16/bomb.png" },
-	{ token = "e2",  label = "E2",       icon = "icon16/chip.png" },
-	{ token = "sf",  label = "Starfall", icon = "icon16/star.png" },
-	{ token = "tpg", label = "TPG",      icon = "icon16/flag_red.png" },
+-- Search filters come from the website (/api/public/search-scopes), so they follow
+-- whatever knowledge it actually holds. Until that answers, only ACE is offered.
+local KNOWN = {
+	filters = { { token = "ace", label = "ACE", kind = "ace" } },
+	orgs = {},
 }
+local ICONS = { ace = "icon16/shield.png", library = "icon16/book.png" }
 
 -- Content column never grows past this, so the layout stays centered on wide screens.
 local MAX_WIDTH = 820
@@ -144,6 +143,12 @@ function PANEL:Init()
 	self.FilterBar:DockMargin(0, 0, 0, 10)
 	self.FilterBar:SetPaintBackground(false)
 	self:RebuildFilters()
+	API.Scopes(function(ok, data)
+		if not ok or not istable(data.filters) then return end
+		KNOWN.filters = data.filters
+		KNOWN.orgs = istable(data.orgs) and data.orgs or {}
+		if IsValid(self) then self:RebuildFilters() end
+	end)
 
 	self.Body = vgui.Create("DScrollPanel", self)
 	self.Body:Dock(FILL)
@@ -180,33 +185,40 @@ function PANEL:RebuildFilters()
 	end)
 
 	local known = {}
-	for _, f in ipairs(FILTERS) do
-		known[f.token] = true
-		toggle(bar, f.label, f.icon, function() return self.Filters[f.token] end, function() self:ToggleFilter(f.token) end)
-	end
-
-	-- Org wikis picked through "Org wiki..." stay visible as their own toggles.
-	for token in SortedPairs(self.Filters) do
-		if not known[token] then
-			toggle(bar, token, "icon16/group.png", function() return self.Filters[token] end, function() self:ToggleFilter(token) end)
+	for _, f in ipairs(KNOWN.filters) do
+		if isstring(f.token) and isstring(f.label) then
+			known[f.token] = true
+			toggle(bar, f.label, ICONS[f.kind] or ICONS.library, function() return self.Filters[f.token] end,
+				function() self:ToggleFilter(f.token) end)
 		end
 	end
 
+	-- Org wikis picked from the menu stay visible as their own toggles.
+	local orgLabel = {}
+	for _, o in ipairs(KNOWN.orgs) do orgLabel[o.token] = o.label end
+	for token in SortedPairs(self.Filters) do
+		if not known[token] then
+			toggle(bar, orgLabel[token] or token, "icon16/group.png", function() return self.Filters[token] end,
+				function() self:ToggleFilter(token) end)
+		end
+	end
+
+	if #KNOWN.orgs == 0 then return end
 	local org = vgui.Create("DButton", bar)
-	org:SetText("Org wiki...")
+	org:SetText("Org wikis")
 	org:SetIcon("icon16/group_add.png")
 	org:SizeToContentsX(30)
 	org:Dock(LEFT)
-	org:SetTooltip("Search one organization's wiki, e.g. pac3")
+	org:SetTooltip("Search one organization's wiki")
 	org.DoClick = function()
-		Derma_StringRequest("Ask Bob", "Organization name or short name (e.g. pac3):", "", function(text)
-			local token = string.lower(string.Trim(text or ""))
-			token = string.gsub(token, "[^%w%-_]", "")
-			if token == "" then return end
-			self.Filters[token] = true
-			self:RebuildFilters()
-			if string.Trim(self.Entry:GetValue() or "") ~= "" then self:Search() end
-		end)
+		local menu = DermaMenu()
+		for _, o in ipairs(KNOWN.orgs) do
+			if isstring(o.token) and isstring(o.label) then
+				local opt = menu:AddOption(o.label, function() self:ToggleFilter(o.token) end)
+				if self.Filters[o.token] then opt:SetIcon("icon16/tick.png") end
+			end
+		end
+		menu:Open()
 	end
 end
 
@@ -258,7 +270,7 @@ function PANEL:ShowHome()
 	local hi = AskBob.Label(body, "Hi, I'm Bob.", "AskBob.Title")
 	hi:SetContentAlignment(5)
 	hi:DockMargin(0, 24, 0, 4)
-	local intro = AskBob.Label(body, "Ask me about building, wiring, E2, Starfall, ACF and anything in the ACE wikis. "
+	local intro = AskBob.Label(body, "Ask me about building, wiring, E2, Starfall and anything in the ACE wikis. "
 		.. "I look things up on acegmod.com and show you the best page I can find.", "AskBob.Body", C.muted)
 	intro:SetContentAlignment(5)
 	intro:DockMargin(40, 0, 40, 20)
@@ -266,7 +278,7 @@ function PANEL:ShowHome()
 	card(body, {
 		title = "Tips",
 		body = "•  Right-click any entity in the C menu and pick \"Ask Bob about this\".\n"
-			.. "•  Use the buttons under the search box to only search E2, Starfall, ACF or an org wiki.\n"
+			.. "•  Use the buttons under the search box to only search one library or an org wiki.\n"
 			.. "•  In the E2 or Starfall editor, select a function and press \"Ask Bob\".\n"
 			.. "•  Chat: " .. table.concat(AskBob.SplitList(GetConVar("askbob_chat_triggers"):GetString()), " or ") .. " <question>",
 	})

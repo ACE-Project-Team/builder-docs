@@ -31,7 +31,7 @@ local function buildSettings(cp)
 		.. "•  C menu: right-click an entity → \"Ask Bob about this\".\n"
 		.. "•  Press your Ask Bob key while looking at something.\n"
 		.. "•  E2 / Starfall editor: select a function → \"Ask Bob\".\n"
-		.. "•  Filters: the buttons under the search box (E2, Starfall, ACF, ACE, Org wiki...).")
+		.. "•  Filters: the buttons under the search box (the list comes from the website).")
 
 	cp:Help("")
 	cp:Help("Your settings")
