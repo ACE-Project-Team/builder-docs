@@ -5,6 +5,7 @@ local API = AskBob.API
 
 -- Below this top score, with no quick answer, Bob says he isn't sure.
 local LOW_SCORE = 30
+local DISCORD = "https://discord.gg/Y8aEYU6"
 
 local function card(parent, opts)
 	local p = vgui.Create("DPanel", parent)
@@ -493,45 +494,94 @@ function PANEL:RenderResults(query, ok, data, ponder)
 			:DockMargin(0, 0, 0, 6)
 	end
 
-	local qa = data.quickAnswer
-	if istable(qa) then
-		card(body, {
-			title = qa.heading,
-			subtitle = "From " .. tostring(qa.sourceTitle),
-			body = qa.answer .. (qa.truncated and " ..." or ""),
-			color = C.accent,
-			onClick = function() self:OpenResult(qa.sourceUrl) end,
-		})
-	end
-
+	local qa = istable(data.quickAnswer) and data.quickAnswer or nil
 	local results = data.results or {}
 	local top = results[1] and tonumber(results[1].score) or 0
 
-	if #results == 0 and not istable(qa) then
-		card(body, {
-			title = "Bob isn't sure.",
-			body = (istable(data.hint) and data.hint.text) or "Nothing matched that question.",
-			color = C.warn,
-		})
-		local row = buttonRow(body)
+	-- Drop results that are the quick answer's own page, and repeats of the same page.
+	local seen, list = {}, {}
+	if qa and isstring(qa.sourceUrl) then seen[qa.sourceUrl] = true end
+	for _, r in ipairs(results) do
+		if isstring(r.url) and not seen[r.url] then
+			seen[r.url] = true
+			list[#list + 1] = r
+		end
+	end
+
+	-- Nothing useful: lead with where a person can actually help.
+	if not qa and (#list == 0 or top < LOW_SCORE) then
+		local s = sheet(body)
+		s:DockMargin(0, 0, 0, 8)
+		AskBob.Label(s, "Bob doesn't know this one yet.", "AskBob.Title", C.warn):DockMargin(0, 0, 0, 4)
+		AskBob.Label(s, (istable(data.hint) and data.hint.text)
+			or "Nobody has written a page about it. Someone on the ACE Discord probably knows, and once they "
+			.. "answer, writing it down means the next player gets the answer from Bob.", "AskBob.Body", C.muted)
+			:DockMargin(0, 0, 0, 10)
+		local row = buttonRow(s)
+		row:DockMargin(0, 0, 0, 0)
+		button(row, "Ask on Discord", "icon16/comments.png", function() gui.OpenURL(DISCORD) end)
+		button(row, "Write this page", "icon16/page_white_edit.png", function() gui.OpenURL(API.Base() .. "/wiki") end)
 		button(row, "Search the website", "icon16/world.png", function()
 			gui.OpenURL(API.Base() .. "/search?q=" .. API.urlencode(query))
 		end)
-		button(row, "Write this page", "icon16/page_white_edit.png", function() gui.OpenURL(API.Base() .. "/wiki") end)
-	elseif not istable(qa) and top < LOW_SCORE then
-		glass(body, "Bob isn't sure these are right, but they're the closest he found.", "AskBob.Small")
-			:DockMargin(0, 0, 0, 6)
+		if #list > 0 then glass(body, "Closest matches, probably not what you want:", "AskBob.Small"):DockMargin(0, 4, 0, 6) end
+	else
+		glass(body, "Here's what Bob found for \"" .. query .. "\"", "AskBob.Heading"):DockMargin(0, 0, 0, 8)
 	end
 
-	for _, r in ipairs(results) do
-		local sub = string.upper(string.sub(r.type or "", 1, 1)) .. string.sub(r.type or "", 2)
-		if r.meta and r.meta ~= "" then sub = sub .. "  ·  " .. r.meta end
-		card(body, {
+	if qa then
+		local s = sheet(body)
+		s:DockMargin(0, 0, 0, 10)
+		local inner = s.Paint
+		s.Paint = function(p, w, h)
+			inner(p, w, h)
+			draw.RoundedBoxEx(4, 0, 0, 4, h, C.accent, true, false, true, false)
+		end
+		AskBob.Label(s, "ANSWER", "AskBob.Small", C.accent)
+		AskBob.Label(s, qa.heading, "AskBob.Title"):DockMargin(0, 0, 0, 4)
+		AskBob.Label(s, qa.answer .. (qa.truncated and " ..." or ""), "AskBob.Body"):DockMargin(0, 0, 0, 8)
+		local row = buttonRow(s)
+		row:DockMargin(0, 0, 0, 0)
+		button(row, "Read it here", "icon16/book_open.png", function() self:OpenResult(qa.sourceUrl) end)
+		AskBob.Label(row, "from " .. tostring(qa.sourceTitle), "AskBob.Small", C.muted):Dock(FILL)
+	end
+
+	local function resultCard(r)
+		local kind = string.upper(string.sub(r.type or "", 1, 1)) .. string.sub(r.type or "", 2)
+		local sub = kind
+		if r.meta and r.meta ~= "" and string.lower(r.meta) ~= string.lower(kind) then sub = sub .. "  ·  " .. r.meta end
+		return card(body, {
 			title = r.title,
 			subtitle = sub,
 			body = r.description,
 			onClick = function() self:OpenResult(r.url) end,
 		})
+	end
+
+	-- The rest are built now but hidden, so "Show more" keeps them above the tutorials.
+	local shown = qa and 3 or 4
+	if #list > 0 and qa then glass(body, "More pages", "AskBob.Heading"):DockMargin(0, 4, 0, 6) end
+	local hidden = {}
+	for i, r in ipairs(list) do
+		local c = resultCard(r)
+		if i > shown then
+			c:SetVisible(false)
+			hidden[#hidden + 1] = c
+		end
+	end
+
+	if #hidden > 0 then
+		local more = vgui.Create("DButton", body)
+		more:Dock(TOP)
+		more:SetTall(26)
+		more:DockMargin(0, 0, 0, 8)
+		more:SetText("Show " .. #hidden .. " more")
+		more:SetIcon("icon16/arrow_down.png")
+		more.DoClick = function()
+			for _, c in ipairs(hidden) do c:SetVisible(true) end
+			more:Remove()
+			body:InvalidateLayout()
+		end
 	end
 
 	if #weak > 0 then
