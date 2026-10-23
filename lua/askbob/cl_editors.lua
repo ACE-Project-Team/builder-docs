@@ -118,12 +118,21 @@ local function addSFButton()
 	local editor = SF and SF.Editor and SF.Editor.editor
 	if not IsValid(editor) or not IsValid(editor.C and editor.C.ButtonHolder) or IsValid(editor.AskBobButton) then return end
 
-	local b = vgui.Create("DButton", editor.C.ButtonHolder)
+	local holder = editor.C.ButtonHolder
+	-- Use SF's own button class so it matches SFHelper, and copy a sibling's
+	-- height and margins instead of guessing them.
+	local class = vgui.GetControlTable("StarfallButton") and "StarfallButton" or "DButton"
+	local b = vgui.Create(class, holder)
 	b:SetText("Ask Bob")
-	b:SetIcon("icon16/help.png")
-	b:SetSize(80, 22)
+	local sibling
+	for _, child in ipairs(holder:GetChildren()) do
+		if child ~= b and IsValid(child) and child:IsVisible() then sibling = child break end
+	end
+	surface.SetFont(isfunction(b.GetFont) and b:GetFont() or "DermaDefault")
+	local w = surface.GetTextSize("Ask Bob")
+	b:SetSize(w + 20, IsValid(sibling) and sibling:GetTall() or 22)
 	b:Dock(RIGHT)
-	b:DockMargin(4, 0, 0, 0)
+	if IsValid(sibling) then b:DockMargin(sibling:GetDockMargin()) else b:DockMargin(4, 0, 0, 0) end
 	b.DoClick = function()
 		local selection, word
 		local tab = isfunction(editor.GetActiveTab) and editor:GetActiveTab()
