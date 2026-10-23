@@ -1,6 +1,7 @@
 -- Fonts, colours and a small plain-text/markdown renderer for article bodies.
 -- Text only: headings, paragraphs, bullet lists and code blocks.
 
+surface.CreateFont("AskBob.Hero", { font = "Roboto", size = 42, weight = 800 })
 surface.CreateFont("AskBob.Title", { font = "Roboto", size = 22, weight = 700 })
 surface.CreateFont("AskBob.Heading", { font = "Roboto", size = 18, weight = 700 })
 surface.CreateFont("AskBob.Body", { font = "Roboto", size = 15, weight = 400 })
@@ -9,8 +10,8 @@ surface.CreateFont("AskBob.Code", { font = "Consolas", size = 14, weight = 400 }
 
 AskBob.Colors = {
 	-- Matches the default Derma skin so Bob sits next to the Tools tab without clashing.
-	bg      = Color(234, 234, 234),
-	card    = Color(255, 255, 255),
+	bg      = Color(25, 25, 28, 235), -- standalone window only; the tab is see-through
+	card    = Color(255, 255, 255, 245),
 	hover   = Color(229, 241, 255),
 	border  = Color(190, 190, 190),
 	accent  = Color(52, 132, 214),

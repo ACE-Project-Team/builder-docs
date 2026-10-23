@@ -44,6 +44,33 @@ local function card(parent, opts)
 end
 AskBob.Card = card
 
+-- Text drawn straight over the game world (the spawnmenu tab is see-through, like Dupes).
+local function glass(parent, text, font)
+	local lbl = AskBob.Label(parent, text, font, color_white)
+	lbl:SetExpensiveShadow(2, Color(0, 0, 0, 230))
+	return lbl
+end
+
+-- A solid white sheet that grows with its children, for long text such as articles.
+local function sheet(parent)
+	local p = vgui.Create("DPanel", parent)
+	p:Dock(TOP)
+	p:DockPadding(14, 12, 14, 12)
+	p.Paint = function(_, w, h)
+		draw.RoundedBox(4, 0, 0, w, h, C.border)
+		draw.RoundedBox(4, 1, 1, w - 2, h - 2, C.card)
+	end
+	p.PerformLayout = function(s)
+		local h = 0
+		for _, child in ipairs(s:GetChildren()) do
+			local _, y = child:GetPos()
+			h = math.max(h, y + child:GetTall())
+		end
+		s:SetTall(h + 12)
+	end
+	return p
+end
+
 local function button(parent, text, icon, onClick)
 	local b = vgui.Create("DButton", parent)
 	b:SetText(text)
@@ -156,8 +183,9 @@ function PANEL:Init()
 	self:ShowHome()
 end
 
+-- See-through in the spawnmenu; the standalone window sets Solid.
 function PANEL:Paint(w, h)
-	draw.RoundedBox(0, 0, 0, w, h, C.bg)
+	if self.Solid then draw.RoundedBox(0, 0, 0, w, h, C.bg) end
 end
 
 function PANEL:PerformLayout(w)
@@ -267,11 +295,11 @@ end
 function PANEL:ShowHome()
 	local body = self:Clear()
 
-	local hi = AskBob.Label(body, "Hi, I'm Bob.", "AskBob.Title")
+	local hi = glass(body, "Hi, I'm Bob.", "AskBob.Hero")
 	hi:SetContentAlignment(5)
 	hi:DockMargin(0, 24, 0, 4)
-	local intro = AskBob.Label(body, "Ask me about building, wiring, E2, Starfall and anything in the ACE wikis. "
-		.. "I look things up on acegmod.com and show you the best page I can find.", "AskBob.Body", C.muted)
+	local intro = glass(body, "Ask me about building, wiring, E2, Starfall and anything in the ACE wikis. "
+		.. "I look things up on acegmod.com and show you the best page I can find.", "AskBob.Body")
 	intro:SetContentAlignment(5)
 	intro:DockMargin(40, 0, 40, 20)
 
@@ -285,12 +313,12 @@ function PANEL:ShowHome()
 
 	local scope = GetConVar("askbob_scope"):GetString()
 	if scope ~= "" then
-		AskBob.Label(body, "This server limits Bob to: " .. scope, "AskBob.Small", C.muted):DockMargin(0, 0, 0, 8)
+		glass(body, "This server limits Bob to: " .. scope, "AskBob.Small"):DockMargin(0, 0, 0, 8)
 	end
 
 	local tutorials = AskBob.Ponder.All()
 	if #tutorials > 0 then
-		AskBob.Label(body, "Tutorials you can watch", "AskBob.Heading"):DockMargin(0, 8, 0, 6)
+		glass(body, "Tutorials you can watch", "AskBob.Heading"):DockMargin(0, 8, 0, 6)
 		for _, sb in ipairs(tutorials) do
 			card(body, {
 				title = sb.title,
@@ -326,7 +354,7 @@ function PANEL:ShowArticle(slug, url)
 	if back then button(row, "Back", "icon16/arrow_left.png", function() self:RenderResults(unpack(back)) end) end
 	button(row, "Open on website", "icon16/world_go.png", function() gui.OpenURL(API.Absolute(url)) end)
 
-	local loading = AskBob.Label(body, "Bob is reading...", "AskBob.Body", C.muted)
+	local loading = glass(body, "Bob is reading...", "AskBob.Body")
 
 	API.Article(slug, function(ok, article)
 		if not IsValid(self) or self.RequestId ~= id then return end
@@ -336,6 +364,7 @@ function PANEL:ShowArticle(slug, url)
 			return
 		end
 
+		body = sheet(body)
 		AskBob.Label(body, article.title or slug, "AskBob.Title"):DockMargin(0, 0, 0, 2)
 		local meta = {}
 		if article.organization then meta[#meta + 1] = article.organization end
@@ -386,7 +415,7 @@ function PANEL:Search()
 
 	local body = self:Clear()
 	local id = self.RequestId
-	AskBob.Label(body, "Bob is looking...", "AskBob.Body", C.muted)
+	glass(body, "Bob is looking...", "AskBob.Body")
 
 	local ponder = AskBob.Ponder.Search(query)
 	local scopeStr = table.concat(AskBob.SplitList(table.concat(scope, ",")), ",")
@@ -423,7 +452,7 @@ function PANEL:RenderResults(query, ok, data, ponder)
 	end
 
 	if data.scope and data.scope.unknown and #data.scope.unknown > 0 then
-		AskBob.Label(body, "Bob doesn't know the filter: " .. table.concat(data.scope.unknown, ", "), "AskBob.Small", C.warn)
+		glass(body, "Bob doesn't know the filter: " .. table.concat(data.scope.unknown, ", "), "AskBob.Small")
 			:DockMargin(0, 0, 0, 6)
 	end
 
@@ -453,7 +482,7 @@ function PANEL:RenderResults(query, ok, data, ponder)
 		end)
 		button(row, "Write this page", "icon16/page_white_edit.png", function() gui.OpenURL(API.Base() .. "/wiki") end)
 	elseif not istable(qa) and top < LOW_SCORE then
-		AskBob.Label(body, "Bob isn't sure these are right, but they're the closest he found.", "AskBob.Small", C.muted)
+		glass(body, "Bob isn't sure these are right, but they're the closest he found.", "AskBob.Small")
 			:DockMargin(0, 0, 0, 6)
 	end
 
@@ -469,7 +498,7 @@ function PANEL:RenderResults(query, ok, data, ponder)
 	end
 
 	if #weak > 0 then
-		AskBob.Label(body, "Related tutorials", "AskBob.Heading"):DockMargin(0, 8, 0, 6)
+		glass(body, "Related tutorials", "AskBob.Heading"):DockMargin(0, 8, 0, 6)
 		for i = 1, math.min(#weak, 5) do
 			local sb = weak[i]
 			card(body, {
@@ -498,6 +527,7 @@ function AskBob.Open(query, chips)
 		frame:SetDeleteOnClose(false)
 		frame.Bob = vgui.Create("AskBobPanel", frame)
 		frame.Bob:Dock(FILL)
+		frame.Bob.Solid = true
 		AskBob.Frame = frame
 	end
 
