@@ -110,8 +110,6 @@ local function toggle(parent, text, icon, isOn, onClick)
 	if icon then b:SetIcon(icon) end
 	b:SizeToContentsX(30)
 	b:SetTall(24)
-	b:Dock(LEFT)
-	b:DockMargin(0, 0, 4, 0)
 	b.Paint = function(s, w, h)
 		local on = isOn()
 		draw.RoundedBox(4, 0, 0, w, h, on and C.accent or (s:IsHovered() and C.accent or C.border))
@@ -165,11 +163,12 @@ function PANEL:Init()
 	self.Entry:SetPlaceholderText("Ask Bob anything, e.g. \"how do I make a hologram\"")
 	self.Entry.OnEnter = function() self:Search() end
 
-	self.FilterBar = vgui.Create("DPanel", self)
+	-- Wraps onto a second row instead of running off the edge.
+	self.FilterBar = vgui.Create("DIconLayout", self)
 	self.FilterBar:Dock(TOP)
-	self.FilterBar:SetTall(24)
 	self.FilterBar:DockMargin(0, 0, 0, 10)
-	self.FilterBar:SetPaintBackground(false)
+	self.FilterBar:SetSpaceX(4)
+	self.FilterBar:SetSpaceY(4)
 	self:RebuildFilters()
 	API.Scopes(function(ok, data)
 		if not ok or not istable(data.filters) then return end
@@ -206,6 +205,7 @@ end
 function PANEL:RebuildFilters()
 	local bar = self.FilterBar
 	bar:Clear()
+	bar:InvalidateLayout()
 
 	toggle(bar, "Everything", "icon16/world.png", function() return next(self.Filters) == nil end, function()
 		self.Filters = {}
@@ -237,7 +237,7 @@ function PANEL:RebuildFilters()
 	org:SetText("Org wikis")
 	org:SetIcon("icon16/group_add.png")
 	org:SizeToContentsX(30)
-	org:Dock(LEFT)
+	org:SetTall(24)
 	org:SetTooltip("Search one organization's wiki")
 	org.DoClick = function()
 		local menu = DermaMenu()
