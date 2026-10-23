@@ -1,0 +1,6 @@
+{
+	"title": "Ask Bob",
+	"type": "tool",
+	"tags": ["build", "fun"],
+	"ignore": ["*.md", ".git*"]
+}

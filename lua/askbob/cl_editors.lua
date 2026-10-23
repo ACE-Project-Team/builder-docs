@@ -1,0 +1,130 @@
+-- "Ask Bob" buttons in the Expression 2 and Starfall editors.
+-- Both editors are other people's code, so every lookup is guarded: if an
+-- internal changes, the button degrades to "open Bob with the right filter"
+-- instead of erroring inside their editor.
+
+local function trim(s)
+	if not isstring(s) then return nil end
+	s = string.Trim(s)
+	if s == "" or #s > 120 then return nil end
+	return s
+end
+
+-- Word under the caret in a Wire TextEditor panel.
+local function wireCaretWord(ed)
+	local ok, word = pcall(function()
+		local caret = ed.Caret
+		local row = ed.Rows and ed.Rows[caret[1]]
+		if not isstring(row) then return nil end
+
+		local col = caret[2]
+		local before = string.match(string.sub(row, 1, col - 1), "[%w_%.:]*$") or ""
+		local after = string.match(string.sub(row, col), "^[%w_]*") or ""
+		return before .. after
+	end)
+	return ok and trim(word) or nil
+end
+
+local function wireSelection(ed)
+	if not isfunction(ed.HasSelection) or not isfunction(ed.GetSelection) then return nil end
+	local ok, sel = pcall(function() return ed:HasSelection() and ed:GetSelection() or nil end)
+	return ok and trim(sel) or nil
+end
+
+local function textOf(panel)
+	if not IsValid(panel) then return nil end
+	local getter = panel.GetValue or panel.GetText
+	if not isfunction(getter) then return nil end
+	local ok, text = pcall(getter, panel)
+	return ok and trim(text) or nil
+end
+
+-- One menu for both editors: selection, caret word, current error, or just open.
+local function openMenu(scope, selection, word, err)
+	local chip = { label = scope == "e2" and "Expression 2" or "Starfall", query = "", scope = scope, icon = "icon16/script.png" }
+	local menu = DermaMenu()
+
+	if selection then
+		menu:AddOption("Ask about \"" .. selection .. "\"", function() AskBob.Open(selection, { chip }) end)
+			:SetIcon("icon16/text_allcaps.png")
+	end
+	if word and word ~= selection then
+		menu:AddOption("Ask about \"" .. word .. "\"", function() AskBob.Open(word, { chip }) end)
+			:SetIcon("icon16/text_allcaps.png")
+	end
+	if err then
+		-- Strip line/column noise; the message is what's searchable.
+		local message = string.gsub(err, "[Ll]ine %d+,?%s*[Cc]har %d+:?", "")
+		menu:AddOption("Ask about this error", function() AskBob.Open(string.Trim(message), { chip }) end)
+			:SetIcon("icon16/error.png")
+	end
+	menu:AddOption("Open Ask Bob", function() AskBob.Open(nil, { chip }) end):SetIcon("icon16/help.png")
+	menu:Open()
+end
+
+-- Expression 2 --------------------------------------------------------------------
+
+local function addE2Button(editor)
+	if not IsValid(editor) or not IsValid(editor.C and editor.C.Menu) or IsValid(editor.AskBobButton) then return end
+
+	local b = vgui.Create("DButton", editor.C.Menu)
+	b:SetText("Ask Bob")
+	b:SetIcon("icon16/help.png")
+	b:SetSize(80, 20)
+	b:Dock(RIGHT)
+	b:DockMargin(4, 0, 0, 0)
+	b.DoClick = function()
+		local ed = isfunction(editor.GetCurrentEditor) and editor:GetCurrentEditor()
+		local selection = IsValid(ed) and wireSelection(ed) or nil
+		local word = IsValid(ed) and wireCaretWord(ed) or nil
+
+		-- The validation bar (Wire.IssueViewer) holds the last compile result;
+		-- its idle and success texts are not errors.
+		local err = textOf(editor.C.Val)
+		if err then
+			local lower = err:lower()
+			if string.find(lower, "success", 1, true) or string.find(lower, "click to validate", 1, true) then
+				err = nil
+			end
+		end
+
+		openMenu("e2", selection, word, err)
+	end
+	editor.AskBobButton = b
+end
+
+hook.Add("WireEditorOpen", "AskBob.E2", function(editor)
+	-- The bar is laid out on open; add after it settles.
+	timer.Simple(0, function() addE2Button(editor) end)
+end)
+
+-- Starfall -------------------------------------------------------------------------
+
+local function addSFButton()
+	local editor = SF and SF.Editor and SF.Editor.editor
+	if not IsValid(editor) or not IsValid(editor.C and editor.C.ButtonHolder) or IsValid(editor.AskBobButton) then return end
+
+	local b = vgui.Create("DButton", editor.C.ButtonHolder)
+	b:SetText("Ask Bob")
+	b:SetIcon("icon16/help.png")
+	b:SetSize(80, 22)
+	b:Dock(RIGHT)
+	b:DockMargin(4, 0, 0, 0)
+	b.DoClick = function()
+		local selection, word
+		local tab = isfunction(editor.GetActiveTab) and editor:GetActiveTab()
+		local content = IsValid(tab) and isfunction(tab.GetPanel) and tab:GetPanel()
+		-- Only the classic (wire-style) tab exposes selection synchronously; the
+		-- Monaco tab is a browser panel, so there Bob opens with the SF filter.
+		if IsValid(content) then
+			selection = wireSelection(content)
+			word = wireCaretWord(content)
+		end
+		openMenu("sf", selection, word, nil)
+	end
+	editor.AskBobButton = b
+end
+
+hook.Add("StarfallEditorOpen", "AskBob.SF", function()
+	timer.Simple(0, addSFButton)
+end)
