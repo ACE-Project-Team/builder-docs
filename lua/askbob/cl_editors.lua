@@ -133,6 +133,16 @@ local function addSFButton()
 	b:SetSize(w + 20, IsValid(sibling) and sibling:GetTall() or 22)
 	b:Dock(RIGHT)
 	if IsValid(sibling) then b:DockMargin(sibling:GetDockMargin()) else b:DockMargin(4, 0, 0, 0) end
+
+	-- The holder is a fixed 400px box anchored to the right edge that SF's own
+	-- buttons already fill; widen it leftwards by our button so nothing squeezes.
+	local bounds = holder.Bounds
+	if istable(bounds) and isnumber(bounds.x) and isnumber(bounds.w) then
+		local extra = b:GetWide() + 4
+		bounds.x = bounds.x - extra
+		bounds.w = bounds.w + extra
+		editor:InvalidateLayout()
+	end
 	b.DoClick = function()
 		local selection, word
 		local tab = isfunction(editor.GetActiveTab) and editor:GetActiveTab()
