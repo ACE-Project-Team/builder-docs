@@ -525,6 +525,17 @@ function PANEL:Search()
 	local text = string.Trim(self.Entry:GetValue() or "")
 
 	-- "+sf draw line" → scope token "sf", query "draw line".
+	-- Typed "+ai" is a fallback for the AI button: same effect, only where AI is offered.
+	local typedAI
+	text = string.gsub(text, "%+[aA][iI]%f[%W]", function() typedAI = true return "" end)
+	if typedAI then
+		self.Entry:SetValue(string.Trim((string.gsub(self.Entry:GetValue() or "", "%+[aA][iI]%f[%W]", ""))))
+		if self:AIScope() and not self.AIMode then
+			self.AIMode = true
+			self:RebuildFilters()
+		end
+	end
+
 	local scope = AskBob.SplitList(GetConVar("askbob_scope"):GetString())
 	text = string.gsub(text, "%+(%w+)", function(token)
 		scope[#scope + 1] = token:lower()
