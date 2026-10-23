@@ -40,25 +40,39 @@ local function textOf(panel)
 end
 
 -- One menu for both editors: selection, caret word, current error, or just open.
-local function openMenu(scope, selection, word, err)
-	local chip = { label = scope == "e2" and "Expression 2" or "Starfall", query = "", scope = scope, icon = "icon16/script.png" }
-	local menu = DermaMenu()
+local HINT = {
+	e2 = "Bob is best at how-to questions the wiki covers, like \"how do I make a turret\". "
+		.. "For what a single function does, E2Helper is quicker.",
+	sf = "Bob is best at how-to questions the wiki covers, like \"how do I draw a HUD\". "
+		.. "For what a single function does, SFHelper is quicker.",
+}
 
+local function openMenu(scope, selection, word, err)
+	-- The editor's library becomes a filter, not a chip: a chip would search on its own.
+	local filter = scope == "e2" and "wiremod" or "sf"
+	local function ask(q) AskBob.Open(q, nil, { filter = filter }) end
+	local function plain() AskBob.Open("", nil, { filter = filter, hint = HINT[scope] }) end
+
+	local menu = DermaMenu()
+	local any = false
 	if selection then
-		menu:AddOption("Ask about \"" .. selection .. "\"", function() AskBob.Open(selection, { chip }) end)
-			:SetIcon("icon16/text_allcaps.png")
+		any = true
+		menu:AddOption("Ask about \"" .. selection .. "\"", function() ask(selection) end):SetIcon("icon16/text_allcaps.png")
 	end
 	if word and word ~= selection then
-		menu:AddOption("Ask about \"" .. word .. "\"", function() AskBob.Open(word, { chip }) end)
-			:SetIcon("icon16/text_allcaps.png")
+		any = true
+		menu:AddOption("Ask about \"" .. word .. "\"", function() ask(word) end):SetIcon("icon16/text_allcaps.png")
 	end
 	if err then
+		any = true
 		-- Strip line/column noise; the message is what's searchable.
 		local message = string.gsub(err, "[Ll]ine %d+,?%s*[Cc]har %d+:?", "")
-		menu:AddOption("Ask about this error", function() AskBob.Open(string.Trim(message), { chip }) end)
-			:SetIcon("icon16/error.png")
+		menu:AddOption("Ask about this error", function() ask(string.Trim(message)) end):SetIcon("icon16/error.png")
 	end
-	menu:AddOption("Open Ask Bob", function() AskBob.Open(nil, { chip }) end):SetIcon("icon16/help.png")
+
+	-- Nothing to offer but "open": skip the menu.
+	if not any then return plain() end
+	menu:AddOption("Just open Ask Bob", plain):SetIcon("icon16/help.png")
 	menu:Open()
 end
 

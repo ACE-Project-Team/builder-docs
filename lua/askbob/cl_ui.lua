@@ -346,8 +346,12 @@ function PANEL:Clear()
 	return self.Body
 end
 
-function PANEL:ShowHome()
+function PANEL:ShowHome(hint)
 	local body = self:Clear()
+
+	if hint then
+		card(body, { title = "What to ask Bob", body = hint, color = C.accent })
+	end
 
 	local hi = glass(body, "Hi, I'm Bob.", "AskBob.Hero")
 	hi:SetContentAlignment(5)
@@ -361,7 +365,7 @@ function PANEL:ShowHome()
 		title = "Tips",
 		body = "•  Right-click any entity in the C menu and pick \"Ask Bob about this\".\n"
 			.. "•  Use the buttons under the search box to only search one library or an org wiki.\n"
-			.. "•  In the E2 or Starfall editor, select a function and press \"Ask Bob\".\n"
+			.. "•  In the E2 or Starfall editor, press \"Ask Bob\" for how-to questions about your chip.\n"
 			.. "•  Chat: " .. table.concat(AskBob.SplitList(GetConVar("askbob_chat_triggers"):GetString()), " or ") .. " <question>",
 	})
 
@@ -653,7 +657,8 @@ vgui.Register("AskBobPanel", PANEL, "DPanel")
 -- Standalone window ------------------------------------------------------------
 
 -- AskBob.Open("how do I wire", { chip, ... }) — used by chat, C menu, editors, key.
-function AskBob.Open(query, chips)
+-- opts: { filter = "wiremod", hint = "shown on the home view" }
+function AskBob.Open(query, chips, opts)
 	local frame = AskBob.Frame
 	if not IsValid(frame) then
 		frame = vgui.Create("DFrame")
@@ -665,22 +670,29 @@ function AskBob.Open(query, chips)
 		frame.Bob = vgui.Create("AskBobPanel", frame)
 		frame.Bob:Dock(FILL)
 		frame.Bob.Solid = true
-		frame.Bob:ShowHome() -- redraw with dark text now that it is solid
 		AskBob.Frame = frame
 	end
 
 	frame:SetVisible(true)
 	frame:MakePopup()
 
+	-- Each open is a fresh question: last time's text and chips would otherwise
+	-- be searched again before the player has typed anything.
 	local bob = frame.Bob
-	if chips then
-		bob.Chips = {}
-		for _, chip in ipairs(chips) do bob:AddChip(chip) end
-		bob:RebuildChips()
+	opts = opts or {}
+	bob.Chips = {}
+	for _, chip in ipairs(chips or {}) do bob:AddChip(chip) end
+	bob:RebuildChips()
+	bob:SetQuery(query or "")
+	if opts.filter then
+		bob.Filters = { [opts.filter] = true }
+		bob:RebuildFilters()
 	end
-	if query then bob:SetQuery(query) end
+
 	if (query and query ~= "") or (chips and #chips > 0) then
 		bob:Search()
+	else
+		bob:ShowHome(opts.hint)
 	end
 	bob.Entry:RequestFocus()
 	return bob
