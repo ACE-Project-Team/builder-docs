@@ -65,6 +65,7 @@ local ERRORS = {
 	[400] = "Bob didn't understand that question.",
 	[404] = "Bob couldn't find that page.",
 	[429] = "Bob is getting a lot of questions. Try again in a minute.",
+	[502] = "The AI couldn't answer that right now.",
 	[503] = "Bob is taking a break (the API is switched off right now).",
 }
 
@@ -124,6 +125,13 @@ end
 -- { filters = { {token, label, kind}, ... }, orgs = { {token, label}, ... } }
 function API.Scopes(callback)
 	get("/api/public/search-scopes", nil, callback)
+end
+
+-- AI answer (DeepWiki) for one scope token, or ACE's when scope is nil.
+-- { aiGenerated, answerer, label, repo, answer, sourceUrl }. Slow (10-30s) and
+-- metered hard on the site, so only call it when the player turned AI on.
+function API.AskAI(question, scope, callback)
+	get("/api/public/ask", { q = question, scope = scope }, callback)
 end
 
 function API.Article(slug, callback)

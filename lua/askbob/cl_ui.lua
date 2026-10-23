@@ -110,6 +110,48 @@ local ICONS = { ace = "icon16/shield.png", library = "icon16/book.png" }
 -- Content column never grows past this, so the layout stays centered on wide screens.
 local MAX_WIDTH = 820
 
+local GRADIENT = Material("gui/gradient")
+local AI_TINT = Color(132, 92, 214)
+
+-- The AI toggle: a toggle with a slow light sweep every few seconds and a soft
+-- violet pulse on the edge; accent-to-violet fill when on. Different, not loud.
+local function aiToggle(parent, isOn, onClick)
+	local b = vgui.Create("DButton", parent)
+	b:SetText("AI")
+	b:SetIcon("icon16/wand.png")
+	b:SizeToContentsX(30)
+	b:SetTall(24)
+	b:SetTooltip("Also ask an AI that reads the source code. Slower, and it can be wrong.")
+	b.Paint = function(s, w, h)
+		local on = isOn()
+		local t = SysTime()
+		local pulse = (math.sin(t * 2) + 1) / 2
+		local edge = on and AI_TINT or Color(Lerp(pulse, C.border.r, AI_TINT.r),
+			Lerp(pulse, C.border.g, AI_TINT.g), Lerp(pulse, C.border.b, AI_TINT.b))
+		draw.RoundedBox(4, 0, 0, w, h, edge)
+		draw.RoundedBox(4, 1, 1, w - 2, h - 2, on and C.accent or (s:IsHovered() and C.hover or C.card))
+		if on then
+			surface.SetMaterial(GRADIENT)
+			surface.SetDrawColor(AI_TINT.r, AI_TINT.g, AI_TINT.b, 255)
+			-- gui/gradient fades out left to right; flip it so violet sits on the right.
+			surface.DrawTexturedRectUV(1, 1, w - 2, h - 2, 1, 0, 0, 1)
+		end
+
+		-- A soft band crosses in 0.8s, then rests for the rest of 3s.
+		local phase = (t % 3) / 0.8
+		if phase < 1 then
+			local x = -16 + phase * (w + 32)
+			for i = -6, 6 do
+				surface.SetDrawColor(255, 255, 255, (on and 70 or 45) * (1 - math.abs(i) / 7))
+				surface.DrawRect(math.Clamp(x + i * 2, 1, w - 3), 2, 2, h - 4)
+			end
+		end
+		s:SetTextColor(on and color_white or C.text)
+	end
+	b.DoClick = onClick
+	return b
+end
+
 local function toggle(parent, text, icon, isOn, onClick)
 	local b = vgui.Create("DButton", parent)
 	b:SetText(text)
@@ -181,6 +223,7 @@ function PANEL:Init()
 		if not ok or not istable(data.filters) then return end
 		KNOWN.filters = data.filters
 		KNOWN.orgs = istable(data.orgs) and data.orgs or {}
+		KNOWN.ai = data.ai == true
 		if IsValid(self) then self:RebuildFilters() end
 	end)
 
@@ -207,6 +250,23 @@ function PANEL:ToggleFilter(token)
 	self.Filters[token] = not self.Filters[token] or nil
 	self:RebuildFilters()
 	if string.Trim(self.Entry:GetValue() or "") ~= "" then self:Search() end
+end
+
+-- The one scope token an AI question would go to ("ace" with no filter), or nil
+-- when the filters don't point at a single AI-enabled scope. DeepWiki reads one
+-- repo, so two filters at once have no AI answer.
+function PANEL:AIScope()
+	if not KNOWN.ai then return nil end
+	local tokens = table.GetKeys(self.Filters)
+	if #tokens > 1 then return nil end
+	local token = tokens[1] or "ace"
+	for _, f in ipairs(KNOWN.filters) do
+		if f.token == token then return f.ai == true and token or nil end
+	end
+	for _, o in ipairs(KNOWN.orgs) do
+		if o.token == token then return o.ai == true and token or nil end
+	end
+	return nil
 end
 
 function PANEL:RebuildFilters()
@@ -237,6 +297,17 @@ function PANEL:RebuildFilters()
 			toggle(bar, orgLabel[token] or token, "icon16/group.png", function() return self.Filters[token] end,
 				function() self:ToggleFilter(token) end)
 		end
+	end
+
+	-- Only offered while the filters point at something with AI answers turned on.
+	if self:AIScope() then
+		aiToggle(bar, function() return self.AIMode end, function()
+			self.AIMode = not self.AIMode or nil
+			self:RebuildFilters()
+			if self.AIMode and string.Trim(self.Entry:GetValue() or "") ~= "" then self:Search() end
+		end)
+	else
+		self.AIMode = nil
 	end
 
 	if #KNOWN.orgs == 0 then return end
@@ -340,6 +411,7 @@ end
 
 function PANEL:Clear()
 	self.RequestId = self.RequestId + 1
+	self.OnResults = nil
 	if self.Busy then self:SetBusy(false) end
 	self.Body:Clear()
 	self.Body:GetVBar():SetScroll(0)
@@ -480,10 +552,70 @@ function PANEL:Search()
 	local ponder = AskBob.Ponder.Search(query)
 	local scopeStr = table.concat(AskBob.SplitList(table.concat(scope, ",")), ",")
 
+	-- AI runs alongside the index search; when it lands, the results redraw with it.
+	self.AskSeq = (self.AskSeq or 0) + 1
+	local seq = self.AskSeq
+	local aiScope = self.AIMode and self:AIScope()
+	self.AI = aiScope and { pending = true } or nil
+	if aiScope then
+		API.AskAI(query, aiScope ~= "ace" and aiScope or nil, function(ok, data)
+			if not IsValid(self) or self.AskSeq ~= seq then return end
+			self.AI = { ok = ok, data = data }
+			-- Only redraw if the player is still looking at these results.
+			if self.OnResults == seq then
+				self:RenderResults(unpack(self.LastResults))
+				self.OnResults = seq
+			end
+		end)
+	end
+
 	API.Search(query, { scope = scopeStr }, function(ok, data)
 		if not IsValid(self) or self.RequestId ~= id then return end
 		self:RenderResults(query, ok, data, ponder)
+		self.OnResults = seq
 	end)
+end
+
+-- Its own card, labelled as AI, so it is never mistaken for a written page.
+function PANEL:AICard(body)
+	local ai = self.AI
+	local s = sheet(body)
+	s:DockMargin(0, 0, 0, 10)
+	local inner = s.Paint
+	s.Paint = function(p, w, h)
+		inner(p, w, h)
+		draw.RoundedBoxEx(4, 0, 0, 4, h, AI_TINT, true, false, true, false)
+	end
+
+	AskBob.Label(s, "AI-GENERATED ANSWER", "AskBob.Small", AI_TINT)
+	if ai.pending then
+		local started = SysTime()
+		local lbl = AskBob.Label(s, "The AI is reading the source code...", "AskBob.Body", C.muted)
+		lbl.Think = function(l)
+			local secs = math.floor(SysTime() - started)
+			l:SetText("The AI is reading the source code..." .. (secs > 0 and ("  " .. secs .. "s") or ""))
+		end
+		return
+	end
+	local d = ai.data
+	if not ai.ok or not istable(d) or not isstring(d.answer) then
+		AskBob.Label(s, isstring(d) and d or "The AI couldn't answer that.", "AskBob.Body", C.muted)
+		return
+	end
+
+	AskBob.Label(s, "Written by " .. tostring(d.answerer or "an AI") .. " from the " .. tostring(d.repo or d.label)
+		.. " source code. It can be wrong, so check before you rely on it.", "AskBob.Small", C.muted)
+		:DockMargin(0, 0, 0, 6)
+	AskBob.RenderText(s, d.answer, function(url)
+		if isstring(url) and string.match(url, "^https://") then gui.OpenURL(url) end
+	end)
+	-- Source link: only ever DeepWiki's own permalink.
+	if isstring(d.sourceUrl) and string.match(d.sourceUrl, "^https://deepwiki%.com/") then
+		local row = buttonRow(s)
+		row:DockMargin(0, 6, 0, 0)
+		button(row, "Open source", "icon16/world_go.png", function() gui.OpenURL(d.sourceUrl) end)
+		AskBob.Label(row, "on deepwiki.com", "AskBob.Small", C.muted):Dock(FILL)
+	end
 end
 
 function PANEL:FactsCard(body, chip)
@@ -537,6 +669,8 @@ function PANEL:RenderResults(query, ok, data, ponder)
 			weak[#weak + 1] = sb
 		end
 	end
+
+	if self.AI then self:AICard(body) end
 
 	if not ok then
 		card(body, { title = "Hmm.", body = data, color = C.warn })
