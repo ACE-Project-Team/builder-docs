@@ -22,6 +22,9 @@ client("askbob/cl_render.lua")
 client("askbob/cl_ui.lua")
 client("askbob/cl_spawnmenu.lua")
 client("askbob/cl_options.lua")
+if SERVER then
+	for _, f in ipairs(file.Find("askbob/plugins/*.lua", "LUA")) do AddCSLuaFile("askbob/plugins/" .. f) end
+end
 client("askbob/cl_context.lua")
 client("askbob/cl_editors.lua")
 

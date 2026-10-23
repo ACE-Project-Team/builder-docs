@@ -45,7 +45,6 @@ local function card(parent, opts)
 end
 AskBob.Card = card
 
--- Text drawn straight over the game world (the spawnmenu tab is see-through, like Dupes).
 -- Text drawn straight on the background: white over the world in the
 -- spawnmenu, dark on the solid standalone window.
 local function glass(parent, text, font)
@@ -429,7 +428,7 @@ function PANEL:ShowArticle(slug, url)
 		AskBob.Label(body, table.concat(meta, "  ·  "), "AskBob.Small", C.muted):DockMargin(0, 0, 0, 10)
 
 		if article.body then
-			AskBob.RenderText(body, article.body)
+			AskBob.RenderText(body, article.body, function(link) self:OpenResult(link) end)
 			if article.truncated then
 				AskBob.Label(body, "This page is longer than Bob can show. Open it on the website for the rest.", "AskBob.Small", C.muted)
 			end
@@ -483,9 +482,41 @@ function PANEL:Search()
 	end)
 end
 
+function PANEL:FactsCard(body, chip)
+	local s = sheet(body)
+	s:DockMargin(0, 0, 0, 10)
+	AskBob.Label(s, chip.name or chip.class, "AskBob.Title")
+	AskBob.Label(s, chip.class, "AskBob.Small", C.muted):DockMargin(0, 0, 0, 6)
+	if isstring(chip.description) and chip.description ~= "" then
+		AskBob.Label(s, chip.description):DockMargin(0, 0, 0, 6)
+	end
+	for _, fact in ipairs(chip.facts or {}) do
+		local row = vgui.Create("DPanel", s)
+		row:Dock(TOP)
+		row:SetTall(18)
+		row:SetPaintBackground(false)
+		local k = vgui.Create("DLabel", row)
+		k:Dock(LEFT)
+		k:SetWide(120)
+		k:SetFont("AskBob.Body")
+		k:SetTextColor(C.muted)
+		k:SetText(tostring(fact[1]))
+		local v = vgui.Create("DLabel", row)
+		v:Dock(FILL)
+		v:SetFont("AskBob.Body")
+		v:SetTextColor(C.text)
+		v:SetText(tostring(fact[2]))
+	end
+end
+
 function PANEL:RenderResults(query, ok, data, ponder)
 	self.LastResults = { query, ok, data, ponder }
 	local body = self:Clear()
+
+	-- What the entity is, straight from the addon: works even when the site is down.
+	for _, chip in ipairs(self.Chips) do
+		if chip.facts or chip.description then self:FactsCard(body, chip) end
+	end
 
 	-- Strong Ponder matches first: watching beats reading for a beginner.
 	local weak, strong = {}, 0

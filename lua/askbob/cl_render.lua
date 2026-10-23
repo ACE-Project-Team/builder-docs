@@ -3,7 +3,10 @@
 
 surface.CreateFont("AskBob.Hero", { font = "Roboto", size = 42, weight = 800 })
 surface.CreateFont("AskBob.Title", { font = "Roboto", size = 22, weight = 700 })
+surface.CreateFont("AskBob.H1", { font = "Roboto", size = 24, weight = 700 })
+surface.CreateFont("AskBob.H2", { font = "Roboto", size = 20, weight = 700 })
 surface.CreateFont("AskBob.Heading", { font = "Roboto", size = 18, weight = 700 })
+surface.CreateFont("AskBob.Link", { font = "Roboto", size = 15, weight = 400, underline = true })
 surface.CreateFont("AskBob.Body", { font = "Roboto", size = 15, weight = 400 })
 surface.CreateFont("AskBob.Small", { font = "Roboto", size = 13, weight = 400 })
 surface.CreateFont("AskBob.Code", { font = "Consolas", size = 14, weight = 400 })
@@ -47,15 +50,43 @@ local function codeBlock(parent, lines)
 	return box
 end
 
+local ENTITIES = { amp = "&", lt = "<", gt = ">", quot = "\"", apos = "'", nbsp = " " }
+
+-- Plain text for a label: entities decoded, images dropped, [text](url) → text.
+local function inline(s)
+	s = string.gsub(s, "&#(%d+);", function(n)
+		n = tonumber(n)
+		return n and n < 128 and string.char(n) or ""
+	end)
+	s = string.gsub(s, "&(%a+);", function(name) return ENTITIES[name] end)
+	s = string.gsub(s, "!%[[^%]]*%]%([^%)]*%)", "")
+	s = string.gsub(s, "%[([^%]]*)%]%([^%)]*%)", "%1")
+	s = string.gsub(s, "%*%*(.-)%*%*", "%1")
+	s = string.gsub(s, "`([^`]+)`", "%1")
+	return string.Trim(s)
+end
+
+local HEADING_FONT = { "AskBob.H1", "AskBob.H2", "AskBob.Heading" }
+
 -- Renders `text` into `parent` (expected to be a DScrollPanel canvas or panel).
-function AskBob.RenderText(parent, text)
+-- onLink(url), when given, makes lines that are a single link clickable.
+function AskBob.RenderText(parent, text, onLink)
 	local paragraph, code, inCode = {}, {}, false
 
 	local function flush()
 		if #paragraph > 0 then
-			AskBob.Label(parent, table.concat(paragraph, " ")):DockMargin(0, 0, 0, 8)
+			local s = inline(table.concat(paragraph, " "))
+			if s ~= "" then AskBob.Label(parent, s):DockMargin(0, 0, 0, 8) end
 			paragraph = {}
 		end
+	end
+
+	local function linkLine(label, url, indent)
+		local lbl = AskBob.Label(parent, label, "AskBob.Link", C.accent)
+		lbl:DockMargin(indent, 0, 0, 2)
+		lbl:SetMouseInputEnabled(true)
+		lbl:SetCursor("hand")
+		lbl.DoClick = function() onLink(url) end
 	end
 
 	for line in string.gmatch((text or "") .. "\n", "([^\n]*)\n") do
@@ -70,14 +101,23 @@ function AskBob.RenderText(parent, text)
 		elseif inCode then
 			code[#code + 1] = line
 		else
-			local heading = string.match(line, "^#+%s+(.+)$")
+			local hashes, heading = string.match(line, "^(#+)%s+(.+)$")
 			local bullet = string.match(line, "^%s*[%-%*]%s+(.+)$")
+			local onlyLink = onLink and string.match(line, "^%s*[%-%*]?%s*%[([^%]]+)%]%(([^%)]+)%)%s*$")
 			if heading then
 				flush()
-				AskBob.Label(parent, heading, "AskBob.Heading"):DockMargin(0, 6, 0, 4)
+				local font = HEADING_FONT[math.min(#hashes, 3)]
+				AskBob.Label(parent, inline(heading), font):DockMargin(0, #hashes == 1 and 10 or 6, 0, 4)
+			elseif onlyLink then
+				flush()
+				local label, url = string.match(line, "%[([^%]]+)%]%(([^%)]+)%)")
+				linkLine((bullet and "•  " or "") .. inline(label), url, bullet and 8 or 0)
 			elseif bullet then
 				flush()
-				AskBob.Label(parent, "•  " .. bullet):DockMargin(8, 0, 0, 2)
+				local s = inline(bullet)
+				if s ~= "" then AskBob.Label(parent, "•  " .. s):DockMargin(8, 0, 0, 2) end
+			elseif string.match(line, "^%s*[%-%*_]+%s*$") then
+				flush() -- lone "-" or a horizontal rule: nothing to show
 			elseif string.Trim(line) == "" then
 				flush()
 			else

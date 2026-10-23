@@ -24,24 +24,26 @@ function AskBob.ChipFromEntity(ent)
 		return { label = name, query = "prop " .. name, icon = "icon16/brick.png" }
 	end
 
-	-- ACE entities network their exact type, e.g. acf_gun → WireName "120mm Cannon".
-	-- That is what a wiki page is about, far more than the shared class name.
-	local wireName = ent:GetNWString("WireName", "")
-	if wireName ~= "" then name = wireName end
-
 	local scope
 	if string.find(class, "expression2", 1, true) then scope = "e2" end
 	if string.find(class, "starfall", 1, true) then scope = "sf" end
-	if string.match(class, "^acf_") or string.match(class, "^ace_") then scope = "ace" end
 
-	local label = name and (name .. "  ·  " .. class) or class
-	return {
-		label = label,
+	local chip = {
+		name = name,
 		query = name or prettyClass(class),
 		scope = scope,
 		class = class,
 		icon = "icon16/bricks.png",
+		facts = {},
 	}
+
+	-- Addons fill in what only they know: the real name, their wiki scope, stats.
+	-- See README "For addon developers". A hook returning false hides the chip.
+	if hook.Run("AskBob.Describe", ent, chip) == false then return nil end
+
+	chip.label = chip.label or (chip.name and (chip.name .. "  ·  " .. class) or class)
+	if #chip.facts == 0 then chip.facts = nil end
+	return chip
 end
 
 function AskBob.ChipFromTool()
@@ -54,6 +56,12 @@ function AskBob.ChipFromTool()
 	local mode = tool.Mode or "tool"
 	local name = isstring(tool.Name) and language.GetPhrase(tool.Name) or mode
 	return { label = name .. " tool", query = name .. " tool", icon = "icon16/wrench.png" }
+end
+
+-- Plugins for addons Bob knows out of the box. Each one only uses the public
+-- hook above, exactly like a third-party addon would.
+for _, f in ipairs(file.Find("askbob/plugins/*.lua", "LUA")) do
+	include("askbob/plugins/" .. f)
 end
 
 -- C menu (right-click an entity) ----------------------------------------------
