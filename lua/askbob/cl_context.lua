@@ -24,9 +24,15 @@ function AskBob.ChipFromEntity(ent)
 		return { label = name, query = "prop " .. name, icon = "icon16/brick.png" }
 	end
 
+	-- ACE entities network their exact type, e.g. acf_gun → WireName "120mm Cannon".
+	-- That is what a wiki page is about, far more than the shared class name.
+	local wireName = ent:GetNWString("WireName", "")
+	if wireName ~= "" then name = wireName end
+
 	local scope
 	if string.find(class, "expression2", 1, true) then scope = "e2" end
 	if string.find(class, "starfall", 1, true) then scope = "sf" end
+	if string.match(class, "^acf_") or string.match(class, "^ace_") then scope = "ace" end
 
 	local label = name and (name .. "  ·  " .. class) or class
 	return {

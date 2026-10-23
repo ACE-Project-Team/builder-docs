@@ -18,7 +18,15 @@ local function hostOf(url)
 end
 
 function API.Base()
-	local url = string.gsub(GetConVar("askbob_api_url"):GetString(), "/+$", "")
+	local url = string.gsub(string.Trim(GetConVar("askbob_api_url"):GetString()), "/+$", "")
+	-- The console eats everything after "//" unless the value is quoted, so
+	-- `askbob_api_url localhost:3000` (no scheme) is accepted too.
+	if url ~= "" and not string.match(url, "^https?://") then
+		local bare = string.gsub(url, "^https?:?/*", "")
+		local h = string.match(bare, "^([^/:]+)")
+		local isLocal = h == "localhost" or h == "127.0.0.1"
+		url = (isLocal and "http://" or "https://") .. bare
+	end
 	local host = hostOf(url)
 	host = host and host:lower()
 	if host and AskBob.AllowedHosts[host] then
@@ -38,6 +46,14 @@ function API.Absolute(url)
 end
 
 API.urlencode = urlencode
+
+concommand.Add("askbob_status", function()
+	local raw = GetConVar("askbob_api_url"):GetString()
+	print("[Ask Bob] askbob_api_url = \"" .. raw .. "\"  ->  using " .. API.Base())
+	if raw ~= "" and API.Base() == AskBob.DefaultAPI and not string.find(raw, "acegmod.com", 1, true) then
+		print("[Ask Bob] That address isn't allowed (ACE domain or localhost only), so Bob uses the live site.")
+	end
+end, nil, "Show which website Ask Bob is talking to.")
 
 -- "/wiki/foo" or ".../org/x/wiki/foo" → "foo", so Bob can read it in-game.
 function API.WikiSlug(url)
