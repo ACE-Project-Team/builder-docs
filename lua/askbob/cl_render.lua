@@ -62,6 +62,12 @@ local function inline(s)
 	end)
 	s = string.gsub(s, "&(%a+);", function(name) return ENTITIES[name] end)
 	s = string.gsub(s, "!%[[^%]]*%]%([^%)]*%)", "")
+	-- The site writes <img alt> as "[image: alt]". Wiki type icons carry the
+	-- type name ("Entity", "Vector"), so keep a short alt as text, drop the rest.
+	s = string.gsub(s, "%[image:%s*([^%]]*)%]", function(alt)
+		alt = string.Trim(alt)
+		return (#alt > 0 and #alt <= 24 and not string.find(alt, "%s")) and alt or ""
+	end)
 	s = string.gsub(s, "%[([^%]]*)%]%([^%)]*%)", "%1")
 	s = string.gsub(s, "%*%*(.-)%*%*", "%1")
 	s = string.gsub(s, "`([^`]+)`", "%1")
