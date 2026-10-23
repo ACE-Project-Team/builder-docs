@@ -47,10 +47,16 @@ local HINT = {
 		.. "For what a single function does, SFHelper is quicker.",
 }
 
+-- "ents.Create", "hook.Add", "Entity:GetPos": GMod's Lua API capitalises members,
+-- while E2 has no dots and Starfall's libraries are lowercase (render.drawRect).
+local function looksLikeGmodApi(s)
+	return isstring(s) and string.match(s, "^[%a_][%w_]*[%.:]%u[%w_]*$") ~= nil
+end
+
 local function openMenu(scope, selection, word, err)
 	-- The editor's library becomes a filter, not a chip: a chip would search on its own.
 	local filter = scope == "e2" and "wiremod" or "sf"
-	local function ask(q) AskBob.Open(q, nil, { filter = filter }) end
+	local function ask(q) AskBob.Open(q, nil, { filter = looksLikeGmodApi(q) and "gmod" or filter }) end
 	local function plain() AskBob.Open("", nil, { filter = filter, hint = HINT[scope] }) end
 
 	local menu = DermaMenu()
