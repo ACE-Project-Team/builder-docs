@@ -199,6 +199,16 @@ function PANEL:Init()
 	bar:DockMargin(0, 0, 0, 8)
 	bar:SetPaintBackground(false)
 
+	-- Far right: support ACE, the same /funding page as the Options panel's donate link.
+	self.Heart = vgui.Create("DButton", bar)
+	self.Heart:Dock(RIGHT)
+	self.Heart:DockMargin(4, 0, 0, 0)
+	self.Heart:SetWide(30)
+	self.Heart:SetText("")
+	self.Heart:SetIcon("icon16/heart.png")
+	self.Heart:SetTooltip("Support ACE")
+	self.Heart.DoClick = function() gui.OpenURL(API.Base() .. "/funding") end
+
 	self.Go = vgui.Create("DButton", bar)
 	self.Go:Dock(RIGHT)
 	self.Go:SetWide(90)
