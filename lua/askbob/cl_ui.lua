@@ -111,10 +111,12 @@ local ICONS = { ace = "icon16/shield.png", library = "icon16/book.png" }
 local MAX_WIDTH = 820
 
 local GRADIENT = Material("gui/gradient")
-local AI_TINT = Color(132, 92, 214)
+-- ACE's brand red (the website's --accent) and a deeper shade for the gradient.
+local AI_TINT = Color(200, 30, 30)
+local AI_DEEP = Color(120, 14, 14)
 
 -- The AI toggle: a toggle with a slow light sweep every few seconds and a soft
--- violet pulse on the edge; accent-to-violet fill when on. Different, not loud.
+-- red pulse on the edge; ACE red-to-dark fill when on. Different, not loud.
 local function aiToggle(parent, isOn, onClick)
 	local b = vgui.Create("DButton", parent)
 	b:SetText("AI")
@@ -129,21 +131,26 @@ local function aiToggle(parent, isOn, onClick)
 		local edge = on and AI_TINT or Color(Lerp(pulse, C.border.r, AI_TINT.r),
 			Lerp(pulse, C.border.g, AI_TINT.g), Lerp(pulse, C.border.b, AI_TINT.b))
 		draw.RoundedBox(4, 0, 0, w, h, edge)
-		draw.RoundedBox(4, 1, 1, w - 2, h - 2, on and C.accent or (s:IsHovered() and C.hover or C.card))
+		draw.RoundedBox(4, 1, 1, w - 2, h - 2, on and AI_TINT or (s:IsHovered() and C.hover or C.card))
 		if on then
 			surface.SetMaterial(GRADIENT)
-			surface.SetDrawColor(AI_TINT.r, AI_TINT.g, AI_TINT.b, 255)
-			-- gui/gradient fades out left to right; flip it so violet sits on the right.
+			surface.SetDrawColor(AI_DEEP.r, AI_DEEP.g, AI_DEEP.b, 255)
+			-- gui/gradient fades out left to right; flip it so the dark red sits on the right.
 			surface.DrawTexturedRectUV(1, 1, w - 2, h - 2, 1, 0, 0, 1)
 		end
 
-		-- A soft band crosses in 0.8s, then rests for the rest of 3s.
+		-- A soft band crosses in 0.8s, then rests for the rest of 3s. Strips past
+		-- either edge are skipped, not clamped: clamping stacked them into a bright
+		-- box on the right edge as the band left.
 		local phase = (t % 3) / 0.8
 		if phase < 1 then
 			local x = -16 + phase * (w + 32)
 			for i = -6, 6 do
-				surface.SetDrawColor(255, 255, 255, (on and 70 or 45) * (1 - math.abs(i) / 7))
-				surface.DrawRect(math.Clamp(x + i * 2, 1, w - 3), 2, 2, h - 4)
+				local sx = math.floor(x + i * 2)
+				if sx >= 2 and sx <= w - 4 then
+					surface.SetDrawColor(255, 255, 255, (on and 70 or 45) * (1 - math.abs(i) / 7))
+					surface.DrawRect(sx, 2, 2, h - 4)
+				end
 			end
 		end
 		s:SetTextColor(on and color_white or C.text)
@@ -685,6 +692,16 @@ function PANEL:RenderResults(query, ok, data, ponder)
 
 	if not ok then
 		card(body, { title = "Hmm.", body = data, color = C.warn })
+		return
+	end
+
+	-- Small talk ("hi", "thanks", "help"): the site answers from the same table
+	-- as the Discord bot, and there is nothing to search.
+	if isstring(data.reply) and data.reply ~= "" then
+		local s = sheet(body)
+		s:DockMargin(0, 0, 0, 8)
+		AskBob.Label(s, "BOB", "AskBob.Small", C.accent)
+		AskBob.RenderText(s, data.reply)
 		return
 	end
 
