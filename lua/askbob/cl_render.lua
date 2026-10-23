@@ -6,9 +6,11 @@ surface.CreateFont("AskBob.Title", { font = "Roboto", size = 22, weight = 700 })
 surface.CreateFont("AskBob.H1", { font = "Roboto", size = 24, weight = 700 })
 surface.CreateFont("AskBob.H2", { font = "Roboto", size = 20, weight = 700 })
 surface.CreateFont("AskBob.Heading", { font = "Roboto", size = 18, weight = 700 })
-surface.CreateFont("AskBob.Link", { font = "Roboto", size = 15, weight = 400, underline = true })
-surface.CreateFont("AskBob.Body", { font = "Roboto", size = 15, weight = 400 })
-surface.CreateFont("AskBob.Small", { font = "Roboto", size = 13, weight = 400 })
+-- Small text uses Tahoma (Derma's own font): Roboto at 13-15px renders thin
+-- and runs letters together in GMod's rasterizer.
+surface.CreateFont("AskBob.Link", { font = "Tahoma", size = 15, weight = 500, underline = true, extended = true })
+surface.CreateFont("AskBob.Body", { font = "Tahoma", size = 15, weight = 500, extended = true })
+surface.CreateFont("AskBob.Small", { font = "Tahoma", size = 13, weight = 500, extended = true })
 surface.CreateFont("AskBob.Code", { font = "Consolas", size = 14, weight = 400 })
 
 AskBob.Colors = {
