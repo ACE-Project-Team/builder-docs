@@ -1,4 +1,4 @@
-# Builder Docs
+# Builder Docs (aka Ask Bob)
 
 In-game search for Garry's Mod builders. It searches the [ACE](https://acegmod.com) wiki, partner
 wikis (Wiremod, Starfall, PAC3 and more) and their docs, plus any installed
