@@ -1,0 +1,24 @@
+name: GLuaFixer
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'lua/**'
+      - '.glualint.json'
+      - '.github/workflows/glualint.yml'
+  pull_request:
+    paths:
+      - 'lua/**'
+      - '.glualint.json'
+      - '.github/workflows/glualint.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  Lint:
+    uses: FPtje/GLuaFixer/.github/workflows/glualint.yml@7d26f3a416e6174991c21c962aaf295ff3e17f52 # master, 2026-07-17
+    with:
+      config: .glualint.json

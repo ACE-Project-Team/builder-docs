@@ -41,7 +41,7 @@ DESCRIBE.acf_gun = function(ent, chip, add)
 	if ammo ~= "" then add("Loaded", ammo) end
 end
 
-DESCRIBE.acf_engine = function(ent, chip, add)
+DESCRIBE.acf_engine = function(_, chip, add)
 	local def = lookupByName(chip.name or "")
 	if not def then return end
 	chip.description = def.desc
@@ -52,7 +52,7 @@ DESCRIBE.acf_engine = function(ent, chip, add)
 	if def.weight then add("Mass", def.weight .. " kg") end
 end
 
-DESCRIBE.acf_gearbox = function(ent, chip, add)
+DESCRIBE.acf_gearbox = function(_, chip, add)
 	local def = lookupByName(chip.name or "")
 	if not def then return end
 	chip.description = def.desc
@@ -62,7 +62,7 @@ DESCRIBE.acf_gearbox = function(ent, chip, add)
 	if def.weight then add("Mass", def.weight .. " kg") end
 end
 
-DESCRIBE.acf_ammo = function(ent, chip, add)
+DESCRIBE.acf_ammo = function(ent, _, add)
 	local ammo = ent:GetNWString("Ammo", "")
 	if ammo ~= "" then add("Rounds", ammo) end
 end
