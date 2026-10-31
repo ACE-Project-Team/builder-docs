@@ -1,4 +1,4 @@
--- Q menu → Options → Utilities → Ask Bob: settings, how-to, contribute, donate.
+-- Q menu → Options → Utilities → (AskBob.Name): settings, how-to, contribute, donate.
 local function link(cp, text, icon, path)
 	local b = cp:Button(text)
 	b:SetIcon(icon)
@@ -27,17 +27,18 @@ local function section(cp, title)
 end
 
 local function buildSettings(cp)
-	cp:Help("Ask Bob finds answers in the ACE wiki, organization wikis and docs, plus any Ponder tutorials you have installed.")
-	local open = cp:Button("Open Ask Bob")
+	cp:Help("Searches the ACE wiki, partner org wikis and docs on acegmod.com, plus any Ponder tutorials you have installed. "
+		.. "Results are pages written by players; nothing is generated unless you press AI.")
+	local open = cp:Button("Open search")
 	open:SetIcon("icon16/help.png")
 	open.DoClick = function() AskBob.Open() end
 
-	section(cp, "Ways to ask")
-	cp:Help("- The Ask Bob tab in this menu\n"
-		.. "- C menu: right-click an entity, \"Ask Bob about this\"\n"
+	section(cp, "Ways to search")
+	cp:Help("- The " .. AskBob.Name .. " tab in this menu\n"
+		.. "- C menu: right-click an entity, \"Look this up\"\n"
 		.. "- Your \"What is this?\" key while looking at something\n"
-		.. "- The Ask Bob button in the E2 and Starfall editors\n"
-		.. "- Chat: " .. table.concat(AskBob.SplitList(GetConVar("askbob_chat_triggers"):GetString()), " or "))
+		.. "- The \"Search docs\" button in the E2, Starfall and PAC3 editors\n"
+		.. "- Chat: " .. AskBob.ShownTriggers())
 
 	section(cp, "Your settings")
 	cp:CheckBox("Show Ponder tutorials", "askbob_ponder")
@@ -54,17 +55,17 @@ local function buildSettings(cp)
 		cp:ControlHelp("e.g. ace,sf. Empty searches everything.")
 	end
 
-	section(cp, "Bob didn't know?")
-	cp:Help("Everything Bob knows is written by players, so the page may not exist yet.")
+	section(cp, "No good result?")
+	cp:Help("Every page is written by players, so it may not exist yet.")
 	link(cp, "Write for the wiki", "icon16/page_white_edit.png", "/wiki")
 	link(cp, "Donate to ACE", "icon16/heart.png", "/funding")
 
 	section(cp, "Privacy")
 	cp:Help("Only your question is sent, to acegmod.com. No SteamID, name or server address, "
 		.. "and answers are shown as text, never run.")
-	cp:ControlHelp("Ask Bob v" .. AskBob.Version)
+	cp:ControlHelp(AskBob.Name .. " v" .. AskBob.Version)
 end
 
 hook.Add("PopulateToolMenu", "AskBob.Options", function()
-	spawnmenu.AddToolMenuOption("Utilities", "Ask Bob", "askbob_settings", "Ask Bob", "", "", buildSettings)
+	spawnmenu.AddToolMenuOption("Utilities", AskBob.Name, "askbob_settings", AskBob.Name, "", "", buildSettings)
 end)

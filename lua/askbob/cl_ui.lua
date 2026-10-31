@@ -50,7 +50,7 @@ function PANEL:Init()
 	self.Go = vgui.Create("DButton", bar)
 	self.Go:Dock(RIGHT)
 	self.Go:SetWide(90)
-	self.Go:SetText("Ask Bob")
+	self.Go:SetText("Search")
 	self.Go:SetIcon("icon16/magnifier.png")
 	self.Go.DoClick = function() self:Search() end
 
@@ -66,7 +66,7 @@ function PANEL:Init()
 	self.Entry:Dock(FILL)
 	self.Entry:DockMargin(4, 0, 4, 0)
 	self.Entry:SetFont("AskBob.Body")
-	self.Entry:SetPlaceholderText("Ask Bob anything, e.g. \"how do I make a hologram\"")
+	self.Entry:SetPlaceholderText("Search wikis and docs, e.g. \"how do I make a hologram\"")
 	self.Entry.OnEnter = function() self:Search() end
 	-- The site refuses questions over 200 characters; stop typing there.
 	if isfunction(self.Entry.SetMaximumCharCount) then self.Entry:SetMaximumCharCount(MAX_QUERY) end
@@ -93,7 +93,7 @@ end
 
 function PANEL:PerformLayout(w)
 	local side = math.max(8, math.floor((w - MAX_WIDTH) / 2))
-	local l, t, r, b = self:GetDockPadding()
+	local l, t, _, b = self:GetDockPadding()
 	if l ~= side then self:DockPadding(side, t, side, b) end
 end
 
@@ -118,11 +118,11 @@ function PANEL:RebuildChips()
 	self.ChipBar:SetTall(#self.Chips > 0 and 28 or 0)
 	self.ChipBar:DockMargin(0, 0, 0, #self.Chips > 0 and 6 or 0)
 
-	-- "Asking about" pill: what Bob will combine with the typed question.
+	-- "Asking about" pill: what gets combined with the typed question.
 	for i, chip in ipairs(self.Chips) do
 		local b = vgui.Create("DButton", self.ChipBar)
 		b:SetText(chip.label)
-		b:SetTooltip("Bob will ask about this. Click to remove.")
+		b:SetTooltip("Included in the search. Click to remove.")
 		b:SetIcon(chip.icon or "icon16/brick.png")
 		b:SizeToContentsX(52)
 		b:Dock(LEFT)
@@ -147,12 +147,12 @@ end
 function PANEL:SetBusy(busy)
 	self.Busy = busy
 	self.Go:SetEnabled(not busy)
-	self.Go:SetText(busy and "Asking..." or "Ask Bob")
+	self.Go:SetText(busy and "Searching..." or "Search")
 	self:BobMood(busy and "think" or "idle")
 end
 
--- Bob the mascot, Q-menu tab only (the standalone window never calls this):
--- a big one greets on the home view, a small one sits by the search box elsewhere.
+-- The mascot, Q-menu tab only (the standalone window never calls this): a small
+-- logo by the search box. It reacts to searches but never talks.
 function PANEL:EnableMascot()
 	self.MiniBob = vgui.Create("AskBobMascot", self.Home:GetParent())
 	self.MiniBob:Dock(LEFT)
@@ -214,37 +214,28 @@ function PANEL:ShowHome(hint)
 	local body = self:Clear()
 
 	if hint then
-		card(body, { title = "What to ask Bob", body = hint, color = C.accent })
+		card(body, { title = "What to search for", body = hint, color = C.accent })
 	end
 
-	local bob = IsValid(self.MiniBob)
-	if bob then
-		self:ShowMiniBob(false)
-		local big = vgui.Create("AskBobMascot", body)
-		big:Dock(TOP)
-		big:SetTall(112)
-		big:DockMargin(0, 16, 0, 0)
-	end
-
-	local hi = glass(body, "Hi, I'm Bob.", "AskBob.Hero")
-	hi:SetContentAlignment(5)
-	hi:DockMargin(0, bob and 4 or 24, 0, 4)
-	local intro = glass(body, "Ask me about building, wiring, E2, Starfall and anything in the ACE wikis. "
-		.. "I look things up on acegmod.com and show you the best page I can find.", "AskBob.Body")
+	local title = glass(body, "Search builder wikis and docs", "AskBob.Hero")
+	title:SetContentAlignment(5)
+	title:DockMargin(0, 24, 0, 4)
+	local intro = glass(body, "Searches the ACE wiki, partner wikis (Wiremod, Starfall, PAC3 and more) and their docs "
+		.. "on acegmod.com. Every result is a page written by players. Nothing is generated unless you press AI.", "AskBob.Body")
 	intro:SetContentAlignment(5)
 	intro:DockMargin(40, 0, 40, 20)
 
 	card(body, {
 		title = "Tips",
-		body = "•  Right-click any entity in the C menu and pick \"Ask Bob about this\".\n"
+		body = "•  Right-click any entity in the C menu and pick \"Look this up\".\n"
 			.. "•  Use the buttons under the search box to only search one library or an org wiki.\n"
-			.. "•  In the E2 or Starfall editor, press \"Ask Bob\" for how-to questions about your chip.\n"
-			.. "•  Chat: " .. table.concat(AskBob.SplitList(GetConVar("askbob_chat_triggers"):GetString()), " or ") .. " <question>",
+			.. "•  In the E2, Starfall or PAC3 editor, press \"Search docs\" for how-to questions.\n"
+			.. "•  Chat: " .. AskBob.ShownTriggers() .. " <question>",
 	})
 
 	local scope = GetConVar("askbob_scope"):GetString()
 	if scope ~= "" then
-		glass(body, "This server limits Bob to: " .. scope, "AskBob.Small"):DockMargin(0, 0, 0, 8)
+		glass(body, "This server limits searches to: " .. scope, "AskBob.Small"):DockMargin(0, 0, 0, 8)
 	end
 
 	local tutorials = AskBob.Ponder.All()
@@ -263,7 +254,7 @@ end
 
 function PANEL:ShowError(message)
 	local body = self:Clear()
-	card(body, { title = "Hmm.", body = message, color = C.warn })
+	card(body, { title = "Something went wrong", body = message, color = C.warn })
 end
 
 -- Search ---------------------------------------------------------------------
@@ -281,7 +272,8 @@ function PANEL:Search()
 	local typedAI
 	text = string.gsub(text, "%+[aA][iI]%f[%W]", function() typedAI = true return "" end)
 	if typedAI then
-		self.Entry:SetValue(string.Trim((string.gsub(self.Entry:GetValue() or "", "%+[aA][iI]%f[%W]", ""))))
+		local stripped = string.gsub(self.Entry:GetValue() or "", "%+[aA][iI]%f[%W]", "")
+		self.Entry:SetValue(string.Trim(stripped))
 		if self:AIScope() and not self.AIMode then
 			self.AIMode = true
 			self:RebuildFilters()
@@ -309,14 +301,14 @@ function PANEL:Search()
 	end
 	-- A paste can still get past the box's limit, and chips add to the query.
 	if #query > MAX_QUERY then
-		self:RenderResults(query, false, "That's too long for Bob (" .. #query .. " characters, the limit is "
+		self:RenderResults(query, false, "That's too long (" .. #query .. " characters, the limit is "
 			.. MAX_QUERY .. "). Shorten it to the question itself, like \"how do I link ammo to a gun\".", {})
 		return
 	end
 
 	local body = self:Clear()
 	local id = self.RequestId
-	self:Loading(body, "Bob is looking...")
+	self:Loading(body, "Searching...")
 
 	local ponder = AskBob.Ponder.Search(query)
 	local scopeStr = table.concat(AskBob.SplitList(table.concat(scope, ",")), ",")
@@ -350,12 +342,12 @@ vgui.Register("AskBobPanel", PANEL, "DPanel")
 -- Standalone window ------------------------------------------------------------
 
 -- AskBob.Open("how do I wire", { chip, ... }) — used by chat, C menu, editors, key.
--- opts: { filter = "wiremod", hint = "shown on the home view" }
+-- opts: { filter = "wiremod", hint = "shown on the home view", avoid = panel not to cover }
 function AskBob.Open(query, chips, opts)
 	local frame = AskBob.Frame
 	if not IsValid(frame) then
 		frame = vgui.Create("DFrame")
-		frame:SetTitle("Ask Bob")
+		frame:SetTitle(AskBob.Name)
 		frame:SetSize(math.min(760, ScrW() - 40), math.min(600, ScrH() - 40))
 		frame:Center()
 		frame:SetSizable(true)
@@ -373,6 +365,17 @@ function AskBob.Open(query, chips, opts)
 	-- be searched again before the player has typed anything.
 	local bob = frame.Bob
 	opts = opts or {}
+
+	-- Don't cover the editor we were opened from (PAC3's sits on a screen edge):
+	-- move to whichever side of it has more room.
+	local avoid = opts.avoid
+	if IsValid(avoid) and avoid:IsVisible() then
+		local ax, aw, fx, fw = avoid:GetX(), avoid:GetWide(), frame:GetX(), frame:GetWide()
+		if fx < ax + aw and fx + fw > ax then
+			local x = ax > ScrW() - (ax + aw) and math.max(0, ax - fw) or math.min(ScrW() - fw, ax + aw)
+			frame:SetX(x)
+		end
+	end
 	bob.Chips = {}
 	for _, chip in ipairs(chips or {}) do bob:AddChip(chip) end
 	bob:RebuildChips()
@@ -393,7 +396,7 @@ end
 
 concommand.Add("askbob", function(_, _, _, argStr)
 	AskBob.Open(argStr ~= "" and argStr or nil)
-end, nil, "Open Ask Bob, optionally with a question.")
+end, nil, "Open the search, optionally with a question.")
 
 net.Receive("askbob_open", function()
 	local q = net.ReadString()

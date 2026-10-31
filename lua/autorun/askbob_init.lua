@@ -33,4 +33,4 @@ end
 client("askbob/cl_context.lua")
 client("askbob/cl_editors.lua")
 
-MsgC(Color(120, 200, 255), "[Ask Bob] ", color_white, "loaded v" .. AskBob.Version .. (SERVER and " (server)\n" or " (client)\n"))
+MsgC(Color(120, 200, 255), "[" .. AskBob.Name .. "] ", color_white, "loaded v" .. AskBob.Version .. (SERVER and " (server)\n" or " (client)\n"))

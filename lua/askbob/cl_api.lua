@@ -49,11 +49,11 @@ API.urlencode = urlencode
 
 concommand.Add("askbob_status", function()
 	local raw = GetConVar("askbob_api_url"):GetString()
-	print("[Ask Bob] askbob_api_url = \"" .. raw .. "\"  ->  using " .. API.Base())
+	print("[" .. AskBob.Name .. "] askbob_api_url = \"" .. raw .. "\"  ->  using " .. API.Base())
 	if raw ~= "" and API.Base() == AskBob.DefaultAPI and not string.find(raw, "acegmod.com", 1, true) then
-		print("[Ask Bob] That address isn't allowed (ACE domain or localhost only), so Bob uses the live site.")
+		print("[" .. AskBob.Name .. "] That address isn't allowed (ACE domain or localhost only), so the live site is used.")
 	end
-end, nil, "Show which website Ask Bob is talking to.")
+end, nil, "Show which website the search is talking to.")
 
 -- "/wiki/foo" or ".../org/x/wiki/foo" → "foo", so Bob can read it in-game.
 function API.WikiSlug(url)
@@ -62,11 +62,11 @@ function API.WikiSlug(url)
 end
 
 local ERRORS = {
-	[400] = "Bob didn't understand that question.",
-	[404] = "Bob couldn't find that page.",
-	[429] = "Bob is getting a lot of questions. Try again in a minute.",
+	[400] = "The site couldn't read that question.",
+	[404] = "That page doesn't exist.",
+	[429] = "Too many searches right now. Try again in a minute.",
 	[502] = "The AI couldn't answer that right now.",
-	[503] = "Bob is taking a break (the API is switched off right now).",
+	[503] = "Search is switched off on the site right now.",
 }
 
 local function get(path, params, callback, retried)
@@ -89,17 +89,17 @@ local function get(path, params, callback, retried)
 		headers = { ["X-AskBob-Version"] = AskBob.Version },
 		success = function(code, body)
 			if code ~= 200 then
-				callback(false, ERRORS[code] or ("Bob got an unexpected answer (" .. code .. ")."))
+				callback(false, ERRORS[code] or ("Unexpected answer from the site (" .. code .. ")."))
 				return
 			end
 			-- Real answers are a few KB; refuse anything big enough to stall the client.
 			if not body or #body > MAX_BODY then
-				callback(false, "Bob got an answer he couldn't read.")
+				callback(false, "The site's answer couldn't be read.")
 				return
 			end
 			local data = util.JSONToTable(body)
 			if not istable(data) then
-				callback(false, "Bob got an answer he couldn't read.")
+				callback(false, "The site's answer couldn't be read.")
 				return
 			end
 			cache[url] = { data = data, expires = SysTime() + CACHE_SECONDS }
@@ -111,7 +111,7 @@ local function get(path, params, callback, retried)
 				timer.Simple(1.5, function() get(path, params, callback, true) end)
 				return
 			end
-			callback(false, "Bob can't reach " .. API.Base() .. " right now (" .. tostring(reason or "no response") .. ").")
+			callback(false, "Can't reach " .. API.Base() .. " right now (" .. tostring(reason or "no response") .. ").")
 		end,
 	})
 end

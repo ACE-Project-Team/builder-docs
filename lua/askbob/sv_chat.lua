@@ -1,7 +1,7 @@
 util.AddNetworkString("askbob_open")
 util.AddNetworkString("askbob_admin_set")
 
--- Is this say-command already owned by ULX/ULib? Bob steps aside rather than
+-- Is this say-command already owned by ULX/ULib? We step aside rather than
 -- both addons reacting to the same message.
 local function ownedByULib(cmd)
 	if not ULib then return false end
@@ -21,7 +21,7 @@ local function rebuildTriggers()
 
 		for _, v in ipairs(variants) do
 			if ownedByULib(v) then
-				MsgC(Color(255, 180, 0), "[Ask Bob] '" .. v .. "' is a ULX/ULib command, skipping it.\n")
+				MsgC(Color(255, 180, 0), "[" .. AskBob.Name .. "] '" .. v .. "' is a ULX/ULib command, skipping it.\n")
 			else
 				triggers[v] = true
 			end
@@ -55,5 +55,5 @@ net.Receive("askbob_admin_set", function(_, ply)
 	-- Only command/token characters; this ends up in a convar and in chat matching.
 	value = string.sub(string.gsub(value, "[^%w!/,%._%-]", ""), 1, 200)
 	GetConVar(name):SetString(value)
-	ply:ChatPrint("[Ask Bob] " .. name .. " = " .. value)
+	ply:ChatPrint("[" .. AskBob.Name .. "] " .. name .. " = " .. value)
 end)

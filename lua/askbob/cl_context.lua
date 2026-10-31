@@ -1,4 +1,4 @@
--- Context chips: turn "this entity" or "this tool" into something Bob searches
+-- Context chips: turn "this entity" or "this tool" into something to search
 -- for, so players can ask "how do I reload" without knowing what the thing is
 -- called. Only reads what the player can already see on their own client.
 
@@ -58,7 +58,7 @@ function AskBob.ChipFromTool()
 	return { label = name .. " tool", query = name .. " tool", icon = "icon16/wrench.png" }
 end
 
--- Plugins for addons Bob knows out of the box. Each one only uses the public
+-- Plugins for addons supported out of the box. Each one only uses the public
 -- hook above, exactly like a third-party addon would.
 for _, f in ipairs(file.Find("askbob/plugins/*.lua", "LUA")) do
 	include("askbob/plugins/" .. f)
@@ -67,7 +67,7 @@ end
 -- C menu (right-click an entity) ----------------------------------------------
 
 properties.Add("askbob", {
-	MenuLabel = "Ask Bob about this",
+	MenuLabel = "Look this up",
 	MenuIcon = "icon16/help.png",
 	Order = 2000,
 	Filter = function(_, ent)
@@ -88,7 +88,7 @@ local function whatIsThis()
 	AskBob.Open(nil, chip and { chip } or nil)
 end
 
-concommand.Add("askbob_whatisthis", whatIsThis, nil, "Ask Bob about what you are looking at.")
+concommand.Add("askbob_whatisthis", whatIsThis, nil, "Look up what you are looking at.")
 
 local wasDown = false
 hook.Add("Think", "AskBob.Key", function()

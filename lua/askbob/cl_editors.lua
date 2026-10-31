@@ -1,7 +1,9 @@
--- "Ask Bob" buttons in the Expression 2 and Starfall editors.
--- Both editors are other people's code, so every lookup is guarded: if an
--- internal changes, the button degrades to "open Bob with the right filter"
+-- "Search docs" buttons in the Expression 2, Starfall and PAC3 editors.
+-- All three editors are other people's code, so every lookup is guarded: if an
+-- internal changes, the button degrades to "open the search with the right filter"
 -- instead of erroring inside their editor.
+
+local LABEL = "Search docs"
 
 local function trim(s)
 	if not isstring(s) then return nil end
@@ -41,11 +43,16 @@ end
 
 -- One menu for both editors: selection, caret word, current error, or just open.
 local HINT = {
-	e2 = "Bob is best at how-to questions the wiki covers, like \"how do I make a turret\". "
+	e2 = "Best for how-to questions the wiki covers, like \"how do I make a turret\". "
 		.. "For what a single function does, E2Helper is quicker.",
-	sf = "Bob is best at how-to questions the wiki covers, like \"how do I draw a HUD\". "
+	sf = "Best for how-to questions the wiki covers, like \"how do I draw a HUD\". "
 		.. "For what a single function does, SFHelper is quicker.",
+	pac3 = "Best for how-to questions the PAC3 wiki covers, like \"how do I make wings flap\". "
+		.. "For what one part's settings do, PAC3's own part help (F1) is quicker.",
 }
+
+-- The editor's library becomes a filter, not a chip: a chip would search on its own.
+local FILTER = { e2 = "wiremod", sf = "sf", pac3 = "pac3" }
 
 -- "ents.Create", "hook.Add", "Entity:GetPos": GMod's Lua API capitalises members,
 -- while E2 has no dots and Starfall's libraries are lowercase (render.drawRect).
@@ -54,8 +61,7 @@ local function looksLikeGmodApi(s)
 end
 
 local function openMenu(scope, selection, word, err)
-	-- The editor's library becomes a filter, not a chip: a chip would search on its own.
-	local filter = scope == "e2" and "wiremod" or "sf"
+	local filter = FILTER[scope]
 	local function ask(q) AskBob.Open(q, nil, { filter = looksLikeGmodApi(q) and "gmod" or filter }) end
 	local function plain() AskBob.Open("", nil, { filter = filter, hint = HINT[scope] }) end
 
@@ -78,7 +84,7 @@ local function openMenu(scope, selection, word, err)
 
 	-- Nothing to offer but "open": skip the menu.
 	if not any then return plain() end
-	menu:AddOption("Just open Ask Bob", plain):SetIcon("icon16/help.png")
+	menu:AddOption("Just open the search", plain):SetIcon("icon16/help.png")
 	menu:Open()
 end
 
@@ -88,9 +94,9 @@ local function addE2Button(editor)
 	if not IsValid(editor) or not IsValid(editor.C and editor.C.Menu) or IsValid(editor.AskBobButton) then return end
 
 	local b = vgui.Create("DButton", editor.C.Menu)
-	b:SetText("Ask Bob")
+	b:SetText(LABEL)
 	b:SetIcon("icon16/help.png")
-	b:SetSize(80, 20)
+	b:SetSize(100, 20)
 	b:Dock(RIGHT)
 	b:DockMargin(4, 0, 0, 0)
 	b.DoClick = function()
@@ -129,13 +135,13 @@ local function addSFButton()
 	-- height and margins instead of guessing them.
 	local class = vgui.GetControlTable("StarfallButton") and "StarfallButton" or "DButton"
 	local b = vgui.Create(class, holder)
-	b:SetText("Ask Bob")
+	b:SetText(LABEL)
 	local sibling
 	for _, child in ipairs(holder:GetChildren()) do
 		if child ~= b and IsValid(child) and child:IsVisible() then sibling = child break end
 	end
 	surface.SetFont(isfunction(b.GetFont) and b:GetFont() or "DermaDefault")
-	local w = surface.GetTextSize("Ask Bob")
+	local w = surface.GetTextSize(LABEL)
 	b:SetSize(w + 20, IsValid(sibling) and sibling:GetTall() or 22)
 	b:Dock(RIGHT)
 	if IsValid(sibling) then b:DockMargin(sibling:GetDockMargin()) else b:DockMargin(4, 0, 0, 0) end
@@ -166,4 +172,63 @@ end
 
 hook.Add("StarfallEditorOpen", "AskBob.SF", function()
 	timer.Simple(0, addSFButton)
+end)
+
+-- PAC3 -------------------------------------------------------------------------
+-- PAC3 runs hook "pace_On<Event>" before its own pace.On<Event>, and a hook that
+-- returns false cancels PAC's handler. So these hooks must never return a value.
+
+-- "model2" / "entity2" are the current versions of model / entity.
+local function pacClassName(part)
+	return isstring(part.ClassName) and (string.gsub(part.ClassName, "%d+$", "")) or nil
+end
+
+-- Suggestions from the part selected in the editor tree, read when the menu opens.
+local function pacSuggestions()
+	local part = pace and pace.current_part
+	local ok, valid = pcall(function() return part and part:IsValid() end)
+	if not ok or not valid then return {} end
+
+	local out = {}
+	local class = pacClassName(part)
+	if class then
+		out[#out + 1] = { "Ask about the \"" .. class .. "\" part", class .. " part", "icon16/brick.png" }
+	end
+	if part.ClassName == "event" and isfunction(part.GetEvent) then
+		local okEvent, event = pcall(part.GetEvent, part)
+		event = okEvent and trim(event) or nil
+		if event then
+			out[#out + 1] = { "Ask about the \"" .. event .. "\" event", event .. " event", "icon16/clock.png" }
+		end
+	end
+	return out
+end
+
+local function pacAsk(q)
+	AskBob.Open(q, nil, { filter = FILTER.pac3, hint = q == "" and HINT.pac3 or nil, avoid = pace and pace.Editor })
+end
+
+-- Refilled every time it opens, so the suggestions follow the selected part.
+local function fillPACMenu(menu)
+	menu:Clear()
+	for _, s in ipairs(pacSuggestions()) do
+		menu:AddOption(s[1], function() pacAsk(s[2]) end):SetIcon(s[3])
+	end
+	menu:AddOption(LABEL .. "...", function() pacAsk("") end):SetIcon("icon16/magnifier.png")
+end
+
+-- PAC rebuilds its menu bar from scratch (removing every menu first), so add
+-- ours after it has finished. The menu is our own DMenu, never one of PAC's.
+hook.Add("pace_OnMenuBarPopulate", "AskBob.PAC3", function(bar)
+	timer.Simple(0, function()
+		if not IsValid(bar) or not isfunction(bar.AddMenu) or IsValid(bar.AskBobMenu) then return end
+		local menu = bar:AddMenu("docs")
+		if not IsValid(menu) then return end
+		local open = menu.Open
+		menu.Open = function(m, ...)
+			fillPACMenu(m)
+			return open(m, ...)
+		end
+		bar.AskBobMenu = menu
+	end)
 end)

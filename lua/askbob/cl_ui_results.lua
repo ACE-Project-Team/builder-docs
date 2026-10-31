@@ -6,7 +6,7 @@ local UI = AskBob.UI
 local card, glass, sheet, button, buttonRow = UI.Card, UI.Glass, UI.Sheet, UI.Button, UI.ButtonRow
 local AI_TINT = UI.AI_TINT
 
--- Below this top score, with no quick answer, Bob says he isn't sure.
+-- Below this top score, with no quick answer, the results are marked as unsure.
 local LOW_SCORE = 30
 local DISCORD = "https://discord.gg/Y8aEYU6"
 -- Result types whose name doesn't read well capitalised.
@@ -112,7 +112,7 @@ function PANEL:RenderResults(query, ok, data, ponder)
 	if self.AI then self:AICard(body) end
 
 	if not ok then
-		card(body, { title = "Hmm.", body = data, color = C.warn })
+		card(body, { title = "Something went wrong", body = data, color = C.warn })
 		return
 	end
 
@@ -121,13 +121,13 @@ function PANEL:RenderResults(query, ok, data, ponder)
 	if isstring(data.reply) and data.reply ~= "" then
 		local s = sheet(body)
 		s:DockMargin(0, 0, 0, 8)
-		AskBob.Label(s, "BOB", "AskBob.Small", C.accent)
+		AskBob.Label(s, "REPLY", "AskBob.Small", C.accent)
 		AskBob.RenderText(s, data.reply)
 		return
 	end
 
 	if data.scope and data.scope.unknown and #data.scope.unknown > 0 then
-		glass(body, "Bob doesn't know the filter: " .. table.concat(data.scope.unknown, ", "), "AskBob.Small")
+		glass(body, "Unknown filter: " .. table.concat(data.scope.unknown, ", "), "AskBob.Small")
 			:DockMargin(0, 0, 0, 6)
 	end
 
@@ -150,10 +150,10 @@ function PANEL:RenderResults(query, ok, data, ponder)
 		self:BobMood("unsure")
 		local s = sheet(body)
 		s:DockMargin(0, 0, 0, 8)
-		AskBob.Label(s, "Bob doesn't know this one yet.", "AskBob.Title", C.warn):DockMargin(0, 0, 0, 4)
+		AskBob.Label(s, "No page covers this yet.", "AskBob.Title", C.warn):DockMargin(0, 0, 0, 4)
 		AskBob.Label(s, (istable(data.hint) and data.hint.text)
 			or "Nobody has written a page about it. Someone on the ACE Discord probably knows, and once they "
-			.. "answer, writing it down means the next player gets the answer from Bob.", "AskBob.Body", C.muted)
+			.. "answer, writing it down means the next player finds it here.", "AskBob.Body", C.muted)
 			:DockMargin(0, 0, 0, 10)
 		local row = buttonRow(s)
 		row:DockMargin(0, 0, 0, 0)
@@ -164,7 +164,7 @@ function PANEL:RenderResults(query, ok, data, ponder)
 		end)
 		if #list > 0 then glass(body, "Closest matches, probably not what you want:", "AskBob.Small"):DockMargin(0, 4, 0, 6) end
 	else
-		glass(body, "Here's what Bob found for \"" .. query .. "\"", "AskBob.Heading"):DockMargin(0, 0, 0, 8)
+		glass(body, "Results for \"" .. query .. "\"", "AskBob.Heading"):DockMargin(0, 0, 0, 8)
 	end
 
 	if qa then

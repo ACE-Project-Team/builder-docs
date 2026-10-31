@@ -1,4 +1,4 @@
--- Reading a wiki page inside Bob, with a way back to the results.
+-- Reading a wiki page in-game, with a way back to the results.
 local C = AskBob.Colors
 local API = AskBob.API
 local UI = AskBob.UI
@@ -26,14 +26,14 @@ function PANEL:ShowArticle(slug, url)
 	if back then button(row, "Back", "icon16/arrow_left.png", function() self:RenderResults(unpack(back)) end) end
 	button(row, "Open on website", "icon16/world_go.png", function() gui.OpenURL(API.Absolute(url)) end)
 
-	local loading = self:Loading(body, "Bob is reading...")
+	local loading = self:Loading(body, "Loading page...")
 
 	API.Article(slug, function(ok, article)
 		if not IsValid(self) or self.RequestId ~= id then return end
 		loading:Remove()
 		self:SetBusy(false)
 		if not ok then
-			card(body, { title = "Hmm.", body = article, color = C.warn })
+			card(body, { title = "Something went wrong", body = article, color = C.warn })
 			return
 		end
 
@@ -48,7 +48,7 @@ function PANEL:ShowArticle(slug, url)
 		if article.body then
 			AskBob.RenderText(body, article.body, function(link) self:OpenResult(link) end)
 			if article.truncated then
-				AskBob.Label(body, "This page is longer than Bob can show. Open it on the website for the rest.", "AskBob.Small", C.muted)
+				AskBob.Label(body, "This page is too long to show here. Open it on the website for the rest.", "AskBob.Small", C.muted)
 			end
 		else
 			AskBob.Label(body, "This page can only be read on the website.", "AskBob.Body", C.muted)
