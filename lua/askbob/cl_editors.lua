@@ -3,7 +3,18 @@
 -- internal changes, the button degrades to "open the search with the right filter"
 -- instead of erroring inside their editor.
 
+-- Toolbar buttons read "wiki" (it's what both editors' users call the docs);
+-- the PAC3 submenu keeps "Search docs..." under the Builder Docs entry.
 local LABEL = "Search docs"
+local BUTTON_LABEL = "Search wiki"
+
+-- bob.png is 64px for reuse elsewhere; menu/button icon slots are ~16px, and
+-- SetIcon sizes the image to the material, so shrink it back.
+local function bobIcon(pnl, size)
+	if not isfunction(pnl.SetIcon) then return end
+	pnl:SetIcon("askbob/bob.png")
+	if IsValid(pnl.m_Image) then pnl.m_Image:SetSize(size, size) end
+end
 
 local function trim(s)
 	if not isstring(s) then return nil end
@@ -94,9 +105,15 @@ local function addE2Button(editor)
 	if not IsValid(editor) or not IsValid(editor.C and editor.C.Menu) or IsValid(editor.AskBobButton) then return end
 
 	local b = vgui.Create("DButton", editor.C.Menu)
-	b:SetText(LABEL)
-	b:SetIcon("icon16/help.png")
-	b:SetSize(100, 20)
+	b:SetText(BUTTON_LABEL)
+	-- Left alignment: DButton then puts the icon at x=4 and the text at
+	-- icon+8, so padding is fixed instead of pooled on one side by centering.
+	b:SetContentAlignment(4)
+	bobIcon(b, 16)
+	surface.SetFont(isfunction(b.GetFont) and b:GetFont() or "DermaDefault")
+	local w = surface.GetTextSize(BUTTON_LABEL)
+	-- icon zone 24px (4 pad + 16 icon + 4 gap) + text + matching 4px right pad
+	b:SetSize(w + 28, 20)
 	b:Dock(RIGHT)
 	b:DockMargin(4, 0, 0, 0)
 	b.DoClick = function()
@@ -135,14 +152,23 @@ local function addSFButton()
 	-- height and margins instead of guessing them.
 	local class = vgui.GetControlTable("StarfallButton") and "StarfallButton" or "DButton"
 	local b = vgui.Create(class, holder)
-	b:SetText(LABEL)
+	b:SetText(BUTTON_LABEL)
+	if class == "StarfallButton" then
+		-- SF draws the icon at x=6 and autosizes to the text width only; stop
+		-- the resize and indent the text clear of the icon.
+		b:SetAutoSize(false)
+		b:SetContentAlignment(4)
+		b:SetTextInset(28, 0)
+	end
+	bobIcon(b, 14)
 	local sibling
 	for _, child in ipairs(holder:GetChildren()) do
 		if child ~= b and IsValid(child) and child:IsVisible() then sibling = child break end
 	end
 	surface.SetFont(isfunction(b.GetFont) and b:GetFont() or "DermaDefault")
-	local w = surface.GetTextSize(LABEL)
-	b:SetSize(w + 20, IsValid(sibling) and sibling:GetTall() or 22)
+	local w = surface.GetTextSize(BUTTON_LABEL)
+	-- icon zone 28px (6 pad + 16 icon + 6 gap) + text + matching 6px right pad
+	b:SetSize(w + 34, IsValid(sibling) and sibling:GetTall() or 22)
 	b:Dock(RIGHT)
 	if IsValid(sibling) then b:DockMargin(sibling:GetDockMargin()) else b:DockMargin(4, 0, 0, 0) end
 
@@ -218,17 +244,56 @@ local function fillPACMenu(menu)
 end
 
 -- PAC rebuilds its menu bar from scratch (removing every menu first), so add
--- ours after it has finished. The menu is our own DMenu, never one of PAC's.
-hook.Add("pace_OnMenuBarPopulate", "AskBob.PAC3", function(bar)
-	timer.Simple(0, function()
-		if not IsValid(bar) or not isfunction(bar.AddMenu) or IsValid(bar.AskBobMenu) then return end
-		local menu = bar:AddMenu("docs")
+-- ours after it has finished. The bar is ~240px wide and PAC's own five menus
+-- already fill it, so a sixth top-level menu would dock off-screen. Put ours
+-- in the pac>help submenu instead, next to the wiki link it searches.
+local function addPACMenu(bar)
+	if not IsValid(bar) or not istable(bar.Menus) then return end
+
+	-- Refilled via the wrapped Open every time, so suggestions follow the part.
+	local function wrap(menu)
 		if not IsValid(menu) then return end
 		local open = menu.Open
 		menu.Open = function(m, ...)
 			fillPACMenu(m)
 			return open(m, ...)
 		end
-		bar.AskBobMenu = menu
-	end)
+		return menu
+	end
+
+	local L = pace and pace.LanguageString or function(s) return s end
+
+	-- The help submenu isn't exposed directly, so find the "help" option
+	-- inside the pac menu and reuse its DMenu. Fall back to tools.
+	local target
+	local pac = bar.Menus["pac"]
+	if IsValid(pac) and isfunction(pac.GetCanvas) then
+		for _, opt in ipairs(pac:GetCanvas():GetChildren()) do
+			if IsValid(opt.SubMenu) and isfunction(opt.GetText) and opt:GetText() == L("help") then
+				target = opt.SubMenu
+				break
+			end
+		end
+	end
+	if not IsValid(target) then
+		target = bar.Menus[L("tools")]
+	end
+
+	if IsValid(target) and isfunction(target.AddSubMenu) and not IsValid(target.AskBobSubMenu) then
+		target:AddSpacer()
+		local sub, opt = target:AddSubMenu("Builder Docs")
+		if IsValid(opt) then bobIcon(opt, 14) end
+		sub = wrap(sub)
+		if IsValid(sub) then
+			sub:SetDeleteSelf(false)
+			target.AskBobSubMenu = sub
+		end
+	elseif isfunction(bar.AddMenu) and not IsValid(bar.AskBobMenu) then
+		-- Last resort: a bar entry. It may dock past the bar's edge.
+		bar.AskBobMenu = wrap(bar:AddMenu("docs"))
+	end
+end
+
+hook.Add("pace_OnMenuBarPopulate", "AskBob.PAC3", function(bar)
+	timer.Simple(0, function() addPACMenu(bar) end)
 end)
